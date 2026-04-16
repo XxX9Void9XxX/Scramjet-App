@@ -16,6 +16,8 @@ const backBtn = document.getElementById("sj-back");
 const forwardBtn = document.getElementById("sj-forward");
 /** @type {HTMLButtonElement} */
 const reloadBtn = document.getElementById("sj-reload");
+/** @type {HTMLButtonElement} */
+const fullscreenBtn = document.getElementById("sj-fullscreen");
 /** @type {HTMLElement} */
 const landing = document.getElementById("landing");
 
@@ -131,6 +133,15 @@ reloadBtn.addEventListener("click", () => {
 	}
 
 	frame.go(currentUrl);
+});
+
+fullscreenBtn.addEventListener("click", async () => {
+	if (!document.fullscreenElement) {
+		await document.documentElement.requestFullscreen();
+		return;
+	}
+
+	await document.exitFullscreen();
 });
 
 updateNavState();
