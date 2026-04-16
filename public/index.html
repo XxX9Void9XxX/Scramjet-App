@@ -6,7 +6,7 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
 		/>
-		<title>Scramjet Browser</title>
+		<title>SSP Proxy</title>
 		<link rel="shortcut icon" href="favicon.ico" />
 
 		<script src="/scram/scramjet.all.js"></script>
@@ -21,16 +21,10 @@
 	<body>
 		<div id="browser-shell" class="browser-shell">
 			<header class="browser-topbar">
-				<div class="window-controls" aria-hidden="true">
-					<span class="dot dot-close"></span>
-					<span class="dot dot-minimize"></span>
-					<span class="dot dot-expand"></span>
-				</div>
-
 				<form id="sj-form" class="toolbar" autocomplete="off">
 					<input
 						id="sj-search-engine"
-						value="https://www.google.com/search?q=%s"
+						value="https://search.yahoo.com/search?p=%s"
 						type="hidden"
 					/>
 					<button id="sj-back" class="toolbar-btn" type="button" title="Back">
@@ -41,6 +35,14 @@
 					</button>
 					<button id="sj-reload" class="toolbar-btn" type="button" title="Reload">
 						&#10227;
+					</button>
+					<button
+						id="sj-fullscreen"
+						class="toolbar-btn"
+						type="button"
+						title="Fullscreen"
+					>
+						&#9974;
 					</button>
 					<input
 						id="sj-address"
@@ -53,12 +55,12 @@
 			</header>
 
 			<main id="landing" class="landing">
-				<div title="Scramjet Logo" class="logo-wrapper">
-					<img class="logo" src="sj.png" alt="Scramjet" />
-					<h1>Scramjet Browser</h1>
+				<div title="SSP Logo" class="logo-wrapper">
+					<img class="logo" src="sj.png" alt="SSP Proxy" />
+					<h1>SSP Proxy</h1>
 					<p>
-						A browser-like interface powered by the Scramjet interception proxy.
-						Enter a URL or search query in the address bar above.
+						Black + purple proxy browser shell powered by Scramjet.
+						Enter a URL or query in the address bar to start browsing.
 					</p>
 				</div>
 			</main>
