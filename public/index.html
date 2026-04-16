@@ -1,66 +1,131 @@
 <!doctype html>
 <html>
-	<head>
-		<meta charset="utf-8" />
-		<meta
-			name="viewport"
-			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
-		/>
-		<title>Scramjet</title>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no"/>
+	<title>Shadow Sites Plus Proxy</title>
 
-		<link rel="shortcut icon" content="favicon.webp" />
-	
-		<script src="/scram/scramjet.all.js"></script>
-		<script src="/baremux/index.js"></script>
-		
-		<link rel="stylesheet" href="index.css" />
-		<script src="register-sw.js" defer></script>
-		<script src="search.js" defer></script>
-		<script src="index.js" defer></script>
-	</head>
+	<link rel="shortcut icon" content="favicon.webp" />
 
-	<body>
-		<div title="Scramjet Logo" class="flex-center logo-wrapper header-center">
-			<img class="logo" src="sj.png" alt="Scramjet" />
-			<h1>Scramjet | MW</h1>
-		</div>
-		<div class="flex-center desc left-margin">
-			<p>
-				Scramjet is an experimental interception based web proxy designed to
-				evade internet censorship, bypass arbitrary web browser restrictions and
-				innovate web proxy technologies.
-			</p>
-		</div>
+	<script src="/scram/scramjet.all.js"></script>
+	<script src="/baremux/index.js"></script>
 
-		<form id="sj-form" class="flex-center">
-			<input
-				id="sj-search-engine"
-				value="https://www.google.com/search?q=%s"
-				type="hidden"
-			/>
-			<input id="sj-address" type="text" placeholder="Search the web freely" />
-		</form>
-		<div class="desc left-margin">
-			<p id="sj-error"></p>
-			<pre id="sj-error-code"></pre>
-		</div>
-		<footer>
-			<div>
-				<a
-					title="The Mercury Workshop GitHub organization"
-					href="https://github.com/MercuryWorkshop"
-					>Mercury Workshop</a
-				>
-				<a
-					title="The example demo app for Scramjet"
-					href="https://github.com/MercuryWorkshop/Scramjet-Demo"
-					>GitHub</a
-				>
-				<a title="License information" href="credits.html">Credits</a>
-			</div>
-			<div>
-				<span>Scramjet &copy; MW 2025</span>
-			</div>
-		</footer>
-	</body>
+	<script src="register-sw.js" defer></script>
+	<script src="search.js" defer></script>
+	<script src="index.js" defer></script>
+
+	<style>
+		body {
+			margin: 0;
+			font-family: Arial, sans-serif;
+			background: radial-gradient(circle at top, #1a0033, #000);
+			color: #fff;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 100vh;
+		}
+
+		.logo-wrapper {
+			text-align: center;
+			margin-bottom: 10px;
+		}
+
+		.logo {
+			width: 90px;
+			filter: drop-shadow(0 0 15px #a020f0);
+		}
+
+		h1 {
+			margin: 10px 0;
+			font-size: 2.2em;
+			color: #c084ff;
+			text-shadow: 0 0 10px #a020f0;
+		}
+
+		.desc {
+			max-width: 600px;
+			text-align: center;
+			color: #ccc;
+			margin-bottom: 20px;
+		}
+
+		form {
+			display: flex;
+			justify-content: center;
+			width: 100%;
+		}
+
+		#sj-address {
+			width: 60%;
+			padding: 14px;
+			border-radius: 10px;
+			border: none;
+			outline: none;
+			font-size: 16px;
+			background: #111;
+			color: white;
+			box-shadow: 0 0 10px #8000ff;
+			transition: 0.2s;
+		}
+
+		#sj-address:focus {
+			box-shadow: 0 0 20px #a020f0;
+		}
+
+		footer {
+			position: absolute;
+			bottom: 10px;
+			text-align: center;
+			font-size: 14px;
+			color: #aaa;
+		}
+
+		footer a {
+			color: #c084ff;
+			text-decoration: none;
+			margin: 0 10px;
+		}
+
+		footer a:hover {
+			text-decoration: underline;
+		}
+
+		#sj-error {
+			color: #ff4d4d;
+			text-align: center;
+		}
+
+		#sj-error-code {
+			color: #888;
+			text-align: center;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="logo-wrapper">
+		<h1>Shadow Sites Plus Proxy</h1>
+	</div>
+
+	<div class="desc">
+		<p>
+		</p>
+	</div>
+
+	<form id="sj-form">
+		<input id="sj-search-engine" value="https://www.google.com/search?q=%s" type="hidden"/>
+		<input id="sj-address" type="text" placeholder="Enter URL or search anything..." />
+	</form>
+
+	<div class="desc">
+		<p id="sj-error"></p>
+		<pre id="sj-error-code"></pre>
+	</div>
+
+	<footer>
+		<div>
+	</footer>
+</body>
 </html>
