@@ -1,141 +1,200 @@
 <!doctype html>
 <html>
 <head>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no"/>
-	<title>Shadow Sites Plus | Proxy</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no"/>
+<title>SSP Browser</title>
 
-	<link rel="shortcut icon" content="favicon.webp" />
+<link rel="shortcut icon" content="favicon.webp" />
 
-	<script src="/scram/scramjet.all.js"></script>
-	<script src="/baremux/index.js"></script>
+<!-- ORIGINAL SCRAMJET SYSTEM (kept intact) -->
+<script src="/scram/scramjet.all.js"></script>
+<script src="/baremux/index.js"></script>
 
-	<script src="register-sw.js" defer></script>
-	<script src="search.js" defer></script>
-	<script src="index.js" defer></script>
+<script src="register-sw.js" defer></script>
+<script src="search.js" defer></script>
+<script src="index.js" defer></script>
 
-	<style>
-		body {
-			margin: 0;
-			font-family: Arial, sans-serif;
-			background: radial-gradient(circle at top, #1a0033, #000);
-			color: #fff;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			height: 100vh;
-		}
+<style>
+body {
+	margin: 0;
+	font-family: Arial, sans-serif;
+	background: #0a0014;
+	color: white;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
 
-		.logo-wrapper {
-			text-align: center;
-			margin-bottom: 10px;
-		}
+/* TOP BAR (browser style) */
+.topbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px;
+	background: linear-gradient(90deg, #120024, #1d0038);
+	box-shadow: 0 0 15px #7a00ff;
+}
 
-		.logo {
-			width: 90px;
-			filter: drop-shadow(0 0 15px #a020f0);
-		}
+/* BUTTONS */
+button {
+	background: #1a0033;
+	border: 1px solid #7a00ff;
+	color: white;
+	padding: 6px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+}
 
-		h1 {
-			margin: 10px 0;
-			font-size: 2.2em;
-			color: #c084ff;
-			text-shadow: 0 0 10px #a020f0;
-		}
+button:hover {
+	background: #2a0055;
+}
 
-		.desc {
-			max-width: 600px;
-			text-align: center;
-			color: #ccc;
-			margin-bottom: 20px;
-		}
+/* ADDRESS BAR */
+#sj-address {
+	flex: 1;
+	padding: 8px;
+	border-radius: 8px;
+	border: none;
+	outline: none;
+	background: #0f001f;
+	color: white;
+	box-shadow: 0 0 10px #7a00ff;
+}
 
-		form {
-			display: flex;
-			justify-content: center;
-			width: 100%;
-		}
+/* PROXY VIEW AREA */
+.viewer {
+	flex: 1;
+	position: relative;
+}
 
-		#sj-address {
-			width: 60%;
-			padding: 14px;
-			border-radius: 10px;
-			border: none;
-			outline: none;
-			font-size: 16px;
-			background: #111;
-			color: white;
-			box-shadow: 0 0 10px #8000ff;
-			transition: 0.2s;
-		}
+iframe {
+	width: 100%;
+	height: 100%;
+	border: none;
+	background: white;
+}
 
-		#sj-address:focus {
-			box-shadow: 0 0 20px #a020f0;
-		}
-
-		footer {
-			position: absolute;
-			bottom: 10px;
-			text-align: center;
-			font-size: 14px;
-			color: #aaa;
-		}
-
-		footer a {
-			color: #c084ff;
-			text-decoration: none;
-			margin: 0 10px;
-		}
-
-		footer a:hover {
-			text-decoration: underline;
-		}
-
-		#sj-error {
-			color: #ff4d4d;
-			text-align: center;
-		}
-
-		#sj-error-code {
-			color: #888;
-			text-align: center;
-		}
-	</style>
+/* LOADING TEXT */
+#status {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	padding: 5px 10px;
+	background: rgba(0,0,0,0.5);
+	border: 1px solid #7a00ff;
+	border-radius: 6px;
+	font-size: 12px;
+}
+</style>
 </head>
 
 <body>
-	<div class="logo-wrapper">
-		<img class="logo" src="sj.png" alt="Scramjet" />
-		<h1>Shadow Sites Plus</h1>
-	</div>
 
-	<div class="desc">
-		<p>
-			Experimental proxy powered by Scramjet. Bypass restrictions, explore freely,
-			and access the web without limits.
-		</p>
-	</div>
+<!-- BROWSER TOP BAR -->
+<div class="topbar">
 
-	<form id="sj-form">
-		<input id="sj-search-engine" value="https://www.google.com/search?q=%s" type="hidden"/>
-		<input id="sj-address" type="text" placeholder="Enter URL or search anything..." />
+	<button onclick="back()">←</button>
+	<button onclick="forward()">→</button>
+	<button onclick="reloadPage()">⟳</button>
+
+	<!-- KEEP ORIGINAL SCRAMJET INPUT ID (IMPORTANT) -->
+	<form id="sj-form" style="display:flex; flex:1;">
+		<input id="sj-search-engine"
+			value="https://www.google.com/search?q=%s"
+			type="hidden" />
+
+		<input id="sj-address"
+			type="text"
+			placeholder="Search or enter URL through proxy..." />
 	</form>
 
-	<div class="desc">
-		<p id="sj-error"></p>
-		<pre id="sj-error-code"></pre>
-	</div>
+	<button onclick="go()">Go</button>
+</div>
 
-	<footer>
-		<div>
-			<a href="https://github.com/MercuryWorkshop">MW</a>
-			<a href="https://github.com/MercuryWorkshop/Scramjet-Demo">Source</a>
-			<a href="credits.html">Credits</a>
-		</div>
-		<div>
-			<span>SSP Proxy © 2026</span>
-		</div>
-	</footer>
+<!-- VIEWER -->
+<div class="viewer">
+	<iframe id="frame"></iframe>
+	<div id="status">Ready</div>
+</div>
+
+<script>
+let historyStack = [];
+let historyIndex = -1;
+
+function setStatus(msg) {
+	document.getElementById("status").innerText = msg;
+}
+
+// NORMALIZE INPUT
+function normalize(input) {
+	if (!input) return "";
+
+	// search mode
+	if (input.includes(" ") || !input.includes(".")) {
+		return "https://www.google.com/search?q=" + encodeURIComponent(input);
+	}
+
+	if (!input.startsWith("http")) {
+		return "https://" + input;
+	}
+
+	return input;
+}
+
+// CORE LOAD FUNCTION (PROXY AWARE HOOK)
+function load(url, addHistory = true) {
+	const frame = document.getElementById("frame");
+
+	setStatus("Loading...");
+
+	// Scramjet interception happens automatically via index.js + scramjet.all.js
+	frame.src = url;
+
+	if (addHistory) {
+		historyStack = historyStack.slice(0, historyIndex + 1);
+		historyStack.push(url);
+		historyIndex++;
+	}
+
+	document.getElementById("sj-address").value = url;
+
+	setTimeout(() => setStatus("Done"), 800);
+}
+
+function go() {
+	const input = document.getElementById("sj-address").value;
+	const url = normalize(input);
+	load(url, true);
+}
+
+function back() {
+	if (historyIndex > 0) {
+		historyIndex--;
+		load(historyStack[historyIndex], false);
+	}
+}
+
+function forward() {
+	if (historyIndex < historyStack.length - 1) {
+		historyIndex++;
+		load(historyStack[historyIndex], false);
+	}
+}
+
+function reloadPage() {
+	const frame = document.getElementById("frame");
+	frame.src = frame.src;
+}
+
+// ENTER KEY SUPPORT
+document.getElementById("sj-address").addEventListener("keydown", e => {
+	if (e.key === "Enter") {
+		e.preventDefault();
+		go();
+	}
+});
+</script>
+
 </body>
 </html>
