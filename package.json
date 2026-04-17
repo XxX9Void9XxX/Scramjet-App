@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Express login system + Scramjet proxy",
   "type": "module",
-  "main": "server.js",
+  "main": "index.js",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=7.0.0"
