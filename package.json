@@ -9,8 +9,8 @@
     "npm": ">=7.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node index.js",
+    "dev": "node index.js",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
