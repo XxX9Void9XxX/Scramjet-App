@@ -21,6 +21,17 @@
 	<body>
 		<div id="browser-shell" class="browser-shell">
 			<header id="browser-topbar" class="browser-topbar">
+				<div id="sj-tabs" class="tabs" role="tablist" aria-label="Browser tabs">
+					<button
+						id="sj-new-tab"
+						class="new-tab-btn"
+						type="button"
+						title="New tab"
+					>
+						+
+					</button>
+				</div>
+
 				<form id="sj-form" class="toolbar" autocomplete="off">
 					<input
 						id="sj-search-engine"
@@ -31,9 +42,21 @@
 						&#8592;
 					</button>
 					<button id="sj-forward" class="toolbar-btn" type="button" title="Forward">
+					<button
+						id="sj-forward"
+						class="toolbar-btn"
+						type="button"
+						title="Forward"
+					>
 						&#8594;
 					</button>
 					<button id="sj-reload" class="toolbar-btn" type="button" title="Reload">
+					<button
+						id="sj-reload"
+						class="toolbar-btn"
+						type="button"
+						title="Reload"
+					>
 						&#10227;
 					</button>
 					<button
@@ -56,6 +79,10 @@
 
 			<main id="landing" class="landing">
 				<h1>Shadow Sites Plus Proxy</h1>
+			<main id="sj-content" class="content-area">
+				<section id="landing" class="landing">
+					<h1>Shadow Sites Plus Proxy</h1>
+				</section>
 			</main>
 
 			<div class="error-area" aria-live="polite">
