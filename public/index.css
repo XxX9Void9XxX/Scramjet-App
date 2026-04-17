@@ -1,20 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
-
-:root {
-	color-scheme: dark;
-	--bg: #060508;
-	--panel: #100816;
-	--panel-elevated: #190d24;
-	--border: rgba(186, 123, 255, 0.34);
-	--text: #f6eeff;
-	--muted: rgba(246, 238, 255, 0.75);
-	--accent: #7a2ce2;
-	--error: #ff8ea0;
-}
-
-* {
-	box-sizing: border-box;
-}
+@@ -18,169 +18,258 @@
 
 html,
 body {
@@ -42,6 +26,8 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 12px;
+	flex-direction: column;
+	gap: 10px;
 	padding: 10px;
 	border: 1px solid var(--border);
 	border-radius: 12px;
@@ -50,6 +36,75 @@ body {
 		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
 		0 0 24px rgba(168, 71, 255, 0.28),
 		0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.tabs {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	overflow-x: auto;
+	padding-bottom: 2px;
+}
+
+.tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 240px;
+	height: 34px;
+	padding: 0 6px 0 12px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: #170c22;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.tab.is-active {
+	background: linear-gradient(180deg, #3f1e67 0%, #241136 100%);
+	color: var(--text);
+}
+
+.tab-select {
+	all: unset;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	cursor: pointer;
+}
+
+.tab-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+	max-width: 180px;
+}
+
+.tab-close {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 15px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 2px 4px;
+	border-radius: 6px;
+}
+
+.tab-close:hover {
+	background: rgba(255, 255, 255, 0.16);
+}
+
+.new-tab-btn {
+	border: 1px dashed var(--border);
+	background: var(--panel-elevated);
+	color: var(--text);
+	height: 34px;
+	min-width: 34px;
+	border-radius: 10px;
+	font-size: 18px;
+	cursor: pointer;
 }
 
 .toolbar {
@@ -82,8 +137,12 @@ body {
 
 .toolbar-btn:hover,
 .go-btn:hover {
+.go-btn:hover,
+.new-tab-btn:hover,
+.tab:hover {
 	filter: brightness(1.08);
 	box-shadow: 0 0 20px rgba(174, 95, 255, 0.45);
+	box-shadow: 0 0 20px rgba(174, 95, 255, 0.35);
 }
 
 .toolbar-btn:disabled {
@@ -113,6 +172,13 @@ body {
 		0 0 20px rgba(168, 71, 255, 0.25);
 }
 
+.content-area {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+}
+
 .landing {
 	flex: 1;
 	display: flex;
@@ -123,6 +189,11 @@ body {
 	border-radius: 12px;
 	background:
 		radial-gradient(circle at center, rgba(162, 85, 255, 0.1) 0%, transparent 52%),
+	background: radial-gradient(
+			circle at center,
+			rgba(162, 85, 255, 0.1) 0%,
+			transparent 52%
+		),
 		linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 65%),
 		var(--panel);
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
@@ -141,13 +212,24 @@ body {
 }
 
 #sj-frame {
+.landing.hidden {
+	display: none;
+}
+
+.sj-frame {
+	display: none;
 	border: 1px solid var(--border);
 	border-radius: 12px;
 	width: 100%;
 	flex: 1;
 	min-height: 0;
+	height: 100%;
 	background: #fff;
 	box-shadow: 0 0 24px rgba(174, 95, 255, 0.16);
+}
+
+.sj-frame.is-active {
+	display: block;
 }
 
 .error-area {
@@ -179,6 +261,7 @@ body.is-fullscreen .error-area {
 }
 
 body.is-fullscreen #sj-frame,
+body.is-fullscreen .sj-frame,
 body.is-fullscreen .landing {
 	border: none;
 	border-radius: 0;
