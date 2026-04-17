@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
 	color-scheme: dark;
@@ -8,7 +8,6 @@
 	--border: rgba(186, 123, 255, 0.34);
 	--text: #f6eeff;
 	--muted: rgba(246, 238, 255, 0.75);
-	--primary: #b26bff;
 	--accent: #7a2ce2;
 	--error: #ff8ea0;
 }
@@ -129,27 +128,16 @@ body {
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
 }
 
-.logo-wrapper {
-	text-align: center;
-	max-width: 720px;
-}
-
-.logo {
-	height: 120px;
-	width: auto;
-	filter: drop-shadow(0 0 14px rgba(175, 102, 255, 0.45));
-}
-
-.logo-wrapper h1 {
-	margin: 12px 0 8px;
-	font-size: 34px;
-	text-shadow: 0 0 22px rgba(174, 95, 255, 0.4);
-}
-
-.logo-wrapper p {
+.landing h1 {
 	margin: 0;
-	line-height: 1.6;
-	color: var(--muted);
+	font-size: clamp(2rem, 5vw, 4rem);
+	font-weight: 800;
+	text-align: center;
+	color: #e7ceff;
+	text-shadow:
+		0 0 10px rgba(200, 140, 255, 0.5),
+		0 0 22px rgba(164, 79, 255, 0.65),
+		0 0 40px rgba(122, 44, 226, 0.5);
 }
 
 #sj-frame {
@@ -178,4 +166,21 @@ body {
 	overflow: auto;
 	font-size: 12px;
 	color: #ffd8dc;
+}
+
+body.is-fullscreen .browser-shell {
+	padding: 0;
+	gap: 0;
+}
+
+body.is-fullscreen .browser-topbar,
+body.is-fullscreen .error-area {
+	display: none;
+}
+
+body.is-fullscreen #sj-frame,
+body.is-fullscreen .landing {
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
 }
