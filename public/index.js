@@ -1,25 +1,24 @@
 "use strict";
-
-/** @type {HTMLFormElement} */
+/**
+ * @type {HTMLFormElement}
+ */
 const form = document.getElementById("sj-form");
-/** @type {HTMLInputElement} */
+/**
+ * @type {HTMLInputElement}
+ */
 const address = document.getElementById("sj-address");
-/** @type {HTMLInputElement} */
+/**
+ * @type {HTMLInputElement}
+ */
 const searchEngine = document.getElementById("sj-search-engine");
-/** @type {HTMLParagraphElement} */
+/**
+ * @type {HTMLParagraphElement}
+ */
 const error = document.getElementById("sj-error");
-/** @type {HTMLPreElement} */
+/**
+ * @type {HTMLPreElement}
+ */
 const errorCode = document.getElementById("sj-error-code");
-/** @type {HTMLButtonElement} */
-const backBtn = document.getElementById("sj-back");
-/** @type {HTMLButtonElement} */
-const forwardBtn = document.getElementById("sj-forward");
-/** @type {HTMLButtonElement} */
-const reloadBtn = document.getElementById("sj-reload");
-/** @type {HTMLButtonElement} */
-const fullscreenBtn = document.getElementById("sj-fullscreen");
-/** @type {HTMLElement} */
-const landing = document.getElementById("landing");
 
 const { ScramjetController } = $scramjetLoadController();
 
@@ -34,114 +33,32 @@ const scramjet = new ScramjetController({
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-let frame = null;
-let currentUrl = "";
-const historyStack = [];
-let historyIndex = -1;
 
-function clearErrors() {
-	error.textContent = "";
-	errorCode.textContent = "";
-}
+form.addEventListener("submit", async (event) => {
+	event.preventDefault();
 
-function showError(message, code = "") {
-	error.textContent = message;
-	errorCode.textContent = code;
-}
+	try {
+		await registerSW();
+	} catch (err) {
+		error.textContent = "Failed to register service worker.";
+		errorCode.textContent = err.toString();
+		throw err;
+	}
 
-function updateNavState() {
-	backBtn.disabled = historyIndex <= 0;
-	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
-}
+	const url = search(address.value, searchEngine.value);
 
-async function ensureTransportReady() {
 	let wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") +
 		"://" +
 		location.host +
 		"/wisp/";
-
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
-		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+		await connection.setTransport("/libcurl/index.mjs", [
+			{ websocket: wispUrl },
+		]);
 	}
-}
-
-function ensureFrame() {
-	if (!frame) {
-		frame = scramjet.createFrame();
-		frame.frame.id = "sj-frame";
-		landing.replaceWith(frame.frame);
-	}
-}
-
-async function navigate(inputValue, pushHistory = true) {
-	if (!inputValue.trim()) {
-		return;
-	}
-
-	clearErrors();
-
-	try {
-		await registerSW();
-		await ensureTransportReady();
-	} catch (err) {
-		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
-		return;
-	}
-
-	const destination = search(inputValue, searchEngine.value);
-	ensureFrame();
-	currentUrl = destination;
-	address.value = destination;
-	frame.go(destination);
-
-	if (pushHistory) {
-		historyStack.splice(historyIndex + 1);
-		historyStack.push(destination);
-		historyIndex = historyStack.length - 1;
-	}
-
-	updateNavState();
-}
-
-form.addEventListener("submit", async (event) => {
-	event.preventDefault();
-	await navigate(address.value, true);
+	const frame = scramjet.createFrame();
+	frame.frame.id = "sj-frame";
+	document.body.appendChild(frame.frame);
+	frame.go(url);
 });
-
-backBtn.addEventListener("click", async () => {
-	if (historyIndex <= 0) {
-		return;
-	}
-
-	historyIndex -= 1;
-	await navigate(historyStack[historyIndex], false);
-});
-
-forwardBtn.addEventListener("click", async () => {
-	if (historyIndex >= historyStack.length - 1) {
-		return;
-	}
-
-	historyIndex += 1;
-	await navigate(historyStack[historyIndex], false);
-});
-
-reloadBtn.addEventListener("click", () => {
-	if (!frame || !currentUrl) {
-		return;
-	}
-
-	frame.go(currentUrl);
-});
-
-fullscreenBtn.addEventListener("click", async () => {
-	if (!document.fullscreenElement) {
-		await document.documentElement.requestFullscreen();
-		return;
-	}
-
-	await document.exitFullscreen();
-});
-
-updateNavState();
