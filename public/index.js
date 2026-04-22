@@ -80,7 +80,7 @@ function setActiveTab(tabId) {
 	}
 
 	const active = getActiveTab();
-	address.value = active?.currentUrl || "";
+	address.value = active && active.currentUrl ? active.currentUrl : "";
 }
 
 function updateTabTitle(tab, titleText) {
@@ -97,7 +97,7 @@ function closeTab(tabId) {
 
 	if (activeTabId === tabId) {
 		const nextTab = tabs[index] || tabs[index - 1] || null;
-		activeTabId = nextTab?.id ?? null;
+		activeTabId = nextTab && nextTab.id ? nextTab.id : null;
 		if (nextTab) {
 			setActiveTab(nextTab.id);
 		} else {
@@ -203,7 +203,9 @@ function createTab(initialUrl = "", activate = true) {
 	frameElement.addEventListener("load", () => {
 		installPopupInterception(tab);
 		try {
-			const pageTitle = tab.frameElement.contentDocument?.title;
+			const pageTitle =
+				tab.frameElement.contentDocument &&
+				tab.frameElement.contentDocument.title;
 			updateTabTitle(tab, pageTitle || tab.currentUrl || "New Tab");
 		} catch {
 			updateTabTitle(tab, tab.currentUrl || "New Tab");
@@ -299,34 +301,46 @@ newTabButton.addEventListener("click", () => {
 		await connection.setTransport("/libcurl/index.mjs", [
 			{ websocket: wispUrl },
 		]);
-autoclickerButton?.addEventListener("click", () => {
-	const active = getActiveTab();
-	if (!active?.frameElement?.contentWindow) {
-		error.textContent = "Open a page first, then run autoclicker.";
-		return;
-	}
+if (autoclickerButton) {
+	autoclickerButton.addEventListener("click", () => {
+		const active = getActiveTab();
+		if (!active || !active.frameElement || !active.frameElement.contentWindow) {
+			error.textContent = "Open a page first, then run autoclicker.";
+			return;
+		}
 
-	try {
-		runAutoClickerInFrame(active.frameElement.contentWindow);
-	} catch (err) {
-		error.textContent = "AutoClicker could not start on this page.";
-		errorCode.textContent = err.toString();
-	}
-});
+		try {
+			runAutoClickerInFrame(active.frameElement.contentWindow);
+		} catch (err) {
+			error.textContent = "AutoClicker could not start on this page.";
+			errorCode.textContent = err.toString();
+		}
+	});
+}
 
 backButton.addEventListener("click", () => {
 	const active = getActiveTab();
-	active?.frameElement?.contentWindow?.history?.back();
+	if (active && active.frameElement && active.frameElement.contentWindow) {
+		active.frameElement.contentWindow.history.back();
+	}
 });
 
 forwardButton.addEventListener("click", () => {
 	const active = getActiveTab();
-	active?.frameElement?.contentWindow?.history?.forward();
+	if (active && active.frameElement && active.frameElement.contentWindow) {
+		active.frameElement.contentWindow.history.forward();
+	}
+	const frame = scramjet.createFrame();
+	frame.frame.id = "sj-frame";
+	document.body.appendChild(frame.frame);
+	frame.go(url);
 });
 
 reloadButton.addEventListener("click", () => {
 	const active = getActiveTab();
-	active?.frameElement?.contentWindow?.location?.reload();
+	if (active && active.frameElement && active.frameElement.contentWindow) {
+		active.frameElement.contentWindow.location.reload();
+	}
 });
 
 fullscreenButton.addEventListener("click", async () => {
@@ -335,10 +349,6 @@ fullscreenButton.addEventListener("click", async () => {
 	} else {
 		await document.exitFullscreen();
 	}
-	const frame = scramjet.createFrame();
-	frame.frame.id = "sj-frame";
-	document.body.appendChild(frame.frame);
-	frame.go(url);
 });
 
 document.addEventListener("fullscreenchange", () => {
