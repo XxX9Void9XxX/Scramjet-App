@@ -1,4 +1,4 @@
-@@ -19,92 +19,144 @@
+@@ -19,92 +19,152 @@
 
 html,
 body {
@@ -53,24 +53,32 @@ body {
 	padding-bottom: 2px;
 }
 
-.tab-btn {
+.tab-item {
 	display: inline-flex;
 	align-items: center;
-	gap: 8px;
-	max-width: 220px;
+	max-width: 240px;
 	height: 34px;
-	padding: 0 10px;
+	padding: 0 4px 0 10px;
 	border: 1px solid var(--border);
 	border-radius: 10px;
 	background: rgba(25, 13, 36, 0.75);
-	color: var(--text);
-	cursor: pointer;
-	font-size: 13px;
 }
 
-.tab-btn.active {
+.tab-item.active {
 	background: linear-gradient(180deg, #a96fff 0%, var(--accent) 100%);
 	border-color: transparent;
+}
+
+.tab-btn {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font-size: 13px;
+	padding: 0;
+	flex: 1;
+	height: 100%;
+	text-align: left;
 }
 
 .tab-title {
@@ -120,7 +128,7 @@ body {
 .toolbar-btn:hover,
 .go-btn:hover {
 .go-btn:hover,
-.tab-btn:hover {
+.tab-item:hover {
 	filter: brightness(1.08);
 	box-shadow: 0 0 20px rgba(174, 95, 255, 0.45);
 }
@@ -146,7 +154,7 @@ body {
 }
 
 #sj-address:focus {
-@@ -130,52 +182,62 @@ body {
+@@ -130,52 +190,62 @@ body {
 }
 
 .logo-wrapper {
