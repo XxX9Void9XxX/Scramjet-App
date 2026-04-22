@@ -92,7 +92,8 @@ function showError(message, code = "") {
 }
 
 function getActiveTab() {
-	return tabs.find((tab) => tab.id === activeTabId) ?? null;
+	const active = tabs.find((tab) => tab.id === activeTabId);
+	return active ? active : null;
 }
 
 function updateNavState() {
@@ -126,7 +127,7 @@ function tabLabel(url) {
 
 	try {
 		return new URL(url).hostname;
-	} catch {
+	} catch (err) {
 		return url;
 	}
 }
@@ -246,7 +247,7 @@ function interceptNewTabBehavior(tab) {
 				},
 				true,
 			);
-		} catch {
+		} catch (err) {
 			// Some pages may block direct interception.
 		}
 	};
@@ -415,6 +416,7 @@ fullscreenBtn.addEventListener("click", async () => {
 	await document.exitFullscreen();
 });
 
+updateNavState();
 newTabBtn.addEventListener("click", () => {
 	createTab();
 });
@@ -437,5 +439,9 @@ tabsEl.addEventListener("click", (event) => {
 	}
 });
 
-createTab();
-updateNavState();
+try {
+	createTab();
+	updateNavState();
+} catch (err) {
+	showError("Failed to initialize browser UI.", String(err));
+}
