@@ -21,6 +21,7 @@
 	<body>
 		<div id="browser-shell" class="browser-shell">
 			<header class="browser-topbar">
+			<header id="browser-topbar" class="browser-topbar">
 				<form id="sj-form" class="toolbar" autocomplete="off">
 					<input
 						id="sj-search-engine"
@@ -31,9 +32,21 @@
 						&#8592;
 					</button>
 					<button id="sj-forward" class="toolbar-btn" type="button" title="Forward">
+					<button
+						id="sj-forward"
+						class="toolbar-btn"
+						type="button"
+						title="Forward"
+					>
 						&#8594;
 					</button>
 					<button id="sj-reload" class="toolbar-btn" type="button" title="Reload">
+					<button
+						id="sj-reload"
+						class="toolbar-btn"
+						type="button"
+						title="Reload"
+					>
 						&#10227;
 					</button>
 					<button
@@ -43,6 +56,16 @@
 						title="Fullscreen"
 					>
 						&#9974;
+					</button>
+					<button
+						id="sj-autoclicker"
+						class="toolbar-btn"
+						type="button"
+						title="AutoClicker"
+						style="font-size: 12px; padding: 0 8px;"
+						style="font-size: 12px; padding: 0 8px"
+					>
+						⚡
 					</button>
 					<input
 						id="sj-address"
@@ -54,21 +77,109 @@
 				</form>
 			</header>
 
+			<section class="tabs-row" aria-label="Proxy tabs">
+				<div id="sj-tabs" class="tabs-list"></div>
+				<button
+					id="sj-new-tab"
+					class="toolbar-btn"
+					type="button"
+					title="New Tab"
+				>
+					+
+				</button>
+			</section>
+
 			<main id="landing" class="landing">
-				<div title="SSP Logo" class="logo-wrapper">
-					<img class="logo" src="sj.png" alt="SSP Proxy" />
-					<h1>SSP Proxy</h1>
+				<div title="Tempest Logo" class="logo-wrapper">
 					<p>
-						Black + purple proxy browser shell powered by Scramjet.
-						Enter a URL or query in the address bar to start browsing.
+						Type a Url or search to begin
 					</p>
+					<p>Type a Url or search to begin</p>
 				</div>
 			</main>
+
+			<section
+				id="sj-frame-area"
+				class="frame-area"
+				aria-label="Proxy content"
+			></section>
 
 			<div class="error-area" aria-live="polite">
 				<p id="sj-error"></p>
 				<pre id="sj-error-code"></pre>
 			</div>
 		</div>
+
+		<script>
+			document.getElementById('sj-autoclicker').addEventListener('click', function() {
+				const autoclickerScript = `
+			document
+				.getElementById("sj-autoclicker")
+				.addEventListener("click", function () {
+					const autoclickerScript = `
+					var DELAYa = prompt("Directions: \\n 1. Enter CPS \\n 2. Click an element \\n 3. Click the same spot to stop. \\n \\n Enter the CPS (clicks per second). Enter 0 to cancel: "); 
+					var shouldRun = true;
+					if (DELAYa == 0) {
+						shouldRun = false;
+					}
+					var DELAY = 1000 / DELAYa;
+
+					var autoClickerStyleElement = document.createElement("style");
+					autoClickerStyleElement.innerHTML = "*{cursor: crosshair !important;}";
+					document.body.appendChild(autoClickerStyleElement);
+
+					function addClicker(e) {
+						if (!e.isTrusted || !shouldRun) {
+							return;
+						}
+						
+						// Remove crosshair cursor and event listener
+						document.body.removeChild(autoClickerStyleElement);
+						document.body.removeEventListener("click", addClicker);
+						e.preventDefault();
+						
+						e.target.classList.add("auto-clicker-target");
+						
+						// Add click listener to the target element for starting/stopping
+						e.target.addEventListener("click", function(clickEvent) {
+@@ -110,34 +138,34 @@
+							}
+							
+							if (e.target.classList.contains("auto-clicker-active")) {
+								// Stop autoclicking
+								e.target.classList.remove("auto-clicker-active");
+							} else {
+								// Start autoclicking
+								e.target.classList.add("auto-clicker-active");
+								autoClick(e.target);
+							}
+							clickEvent.preventDefault();
+						});
+					}
+					
+					function autoClick(element) {
+						if (element.classList.contains("auto-clicker-active")) {
+							element.click();
+							setTimeout(function() {
+								autoClick(element);
+							}, DELAY);
+						}
+					}
+
+					document.body.addEventListener("click", addClicker, 0);
+				`;
+				
+				const script = document.createElement('script');
+				script.textContent = autoclickerScript;
+				document.documentElement.appendChild(script);
+				script.remove();
+			});
+
+					const script = document.createElement("script");
+					script.textContent = autoclickerScript;
+					document.documentElement.appendChild(script);
+					script.remove();
+				});
+		</script>
 	</body>
 </html>
