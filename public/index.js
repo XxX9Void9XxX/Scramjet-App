@@ -26,6 +26,8 @@ const tabsEl = document.getElementById("sj-tabs");
 const landing = document.getElementById("landing");
 
 const { ScramjetController } = $scramjetLoadController();
+let scramjet = null;
+let connection = null;
 
 const scramjet = new ScramjetController({
 	files: {
@@ -34,14 +36,46 @@ const scramjet = new ScramjetController({
 		sync: "/scram/scramjet.sync.js",
 	},
 });
+function getScramjet() {
+	if (scramjet) {
+		return scramjet;
+	}
 
 scramjet.init();
+	if (typeof $scramjetLoadController !== "function") {
+		throw new Error("Scramjet controller script failed to load.");
+	}
+
+	const { ScramjetController } = $scramjetLoadController();
+	scramjet = new ScramjetController({
+		files: {
+			wasm: "/scram/scramjet.wasm.wasm",
+			all: "/scram/scramjet.all.js",
+			sync: "/scram/scramjet.sync.js",
+		},
+	});
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 let frame = null;
 let currentUrl = "";
 const historyStack = [];
 let historyIndex = -1;
+	scramjet.init();
+	return scramjet;
+}
+
+function getConnection() {
+	if (connection) {
+		return connection;
+	}
+
+	if (!window.BareMux || !window.BareMux.BareMuxConnection) {
+		throw new Error("BareMux script failed to load.");
+	}
+
+	connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+	return connection;
+}
 const tabs = [];
 let activeTabId = null;
 let tabIdCounter = 0;
@@ -226,7 +260,7 @@ function ensureTabFrame(tab) {
 	}
 
 	createFrameHost();
-	tab.frame = scramjet.createFrame();
+	tab.frame = getScramjet().createFrame();
 	tab.frame.frame.classList.add("sj-frame");
 	frameHost.append(tab.frame.frame);
 	interceptNewTabBehavior(tab);
@@ -263,6 +297,9 @@ async function ensureTransportReady() {
 
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+	const muxConnection = getConnection();
+	if ((await muxConnection.getTransport()) !== "/libcurl/index.mjs") {
+		await muxConnection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 	}
 }
 
