@@ -113,10 +113,6 @@
 		<script>
 			document.getElementById('sj-autoclicker').addEventListener('click', function() {
 				const autoclickerScript = `
-			document
-				.getElementById("sj-autoclicker")
-				.addEventListener("click", function () {
-					const autoclickerScript = `
 					var DELAYa = prompt("Directions: \\n 1. Enter CPS \\n 2. Click an element \\n 3. Click the same spot to stop. \\n \\n Enter the CPS (clicks per second). Enter 0 to cancel: "); 
 					var shouldRun = true;
 					if (DELAYa == 0) {
@@ -142,7 +138,8 @@
 						
 						// Add click listener to the target element for starting/stopping
 						e.target.addEventListener("click", function(clickEvent) {
-@@ -110,34 +138,34 @@
+							if (!clickEvent.isTrusted) {
+								return;
 							}
 							
 							if (e.target.classList.contains("auto-clicker-active")) {
@@ -174,12 +171,6 @@
 				document.documentElement.appendChild(script);
 				script.remove();
 			});
-
-					const script = document.createElement("script");
-					script.textContent = autoclickerScript;
-					document.documentElement.appendChild(script);
-					script.remove();
-				});
 		</script>
 	</body>
 </html>
