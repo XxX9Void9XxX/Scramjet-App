@@ -1,94 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
-:root {
-	color-scheme: dark;
-	--bg: #060508;
-	--panel: #100816;
-	--panel-elevated: #190d24;
-	--border: rgba(186, 123, 255, 0.34);
-	--text: #f6eeff;
-	--muted: rgba(246, 238, 255, 0.75);
-	--primary: #b26bff;
-	--accent: #7a2ce2;
-	--error: #ff8ea0;
-}
-
-* {
-	box-sizing: border-box;
-}
-
-html,
-body {
-	margin: 0;
-	min-height: 100%;
-	font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-	background: radial-gradient(circle at top, #241133 0%, var(--bg) 46%);
-	color: var(--text);
-}
-
-body {
-	height: 100vh;
-	overflow: hidden;
-}
-
-.browser-shell {
-	display: flex;
-	flex-direction: column;
-	height: 100vh;
-	padding: 12px;
-	gap: 10px;
-}
-
-.browser-topbar {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	padding: 10px;
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	background: linear-gradient(180deg, #1f0f2d 0%, var(--panel) 100%);
-	box-shadow:
-		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
-		0 0 24px rgba(168, 71, 255, 0.28),
-		0 10px 26px rgba(0, 0, 0, 0.4);
-}
-
-.toolbar {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-}
-
-.toolbar-btn,
-.go-btn {
-	border: 1px solid var(--border);
-	background: var(--panel-elevated);
-	color: var(--text);
-	height: 36px;
-	min-width: 36px;
-	border-radius: 10px;
-	font-size: 16px;
-	cursor: pointer;
-	box-shadow: 0 0 14px rgba(122, 44, 226, 0.2);
-}
-
-.go-btn {
-	padding: 0 14px;
-	font-size: 14px;
-	font-weight: 600;
-	background: linear-gradient(180deg, #bd87ff 0%, var(--accent) 100%);
-	border-color: transparent;
-}
-
-.toolbar-btn:hover,
-.go-btn:hover {
-	filter: brightness(1.08);
-	box-shadow: 0 0 20px rgba(174, 95, 255, 0.45);
-}
-
-.toolbar-btn:disabled {
-	opacity: 0.45;
+@@ -92,90 +92,162 @@ body {
 	cursor: not-allowed;
 	filter: none;
 	box-shadow: none;
@@ -115,18 +25,94 @@ body {
 }
 
 .landing {
+.tabs-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 40px;
+}
+
+.tabs-list {
 	flex: 1;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	gap: 8px;
+	overflow-x: auto;
+	padding-bottom: 2px;
+}
+
+.tab-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.tab-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 250px;
+	height: 34px;
+	padding: 0 8px 0 10px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: rgba(25, 13, 36, 0.7);
+	color: var(--text);
+	cursor: pointer;
+}
+
+.tab-item.active .tab-btn {
+	background: linear-gradient(180deg, #2e1243 0%, #1a0b28 100%);
+	box-shadow: 0 0 16px rgba(174, 95, 255, 0.35);
+}
+
+.tab-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+}
+
+.tab-close {
+	height: 24px;
+	width: 24px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	padding: 0;
+}
+
+.tab-close:hover {
+	background: rgba(255, 255, 255, 0.12);
+	color: var(--text);
+}
+
+.landing,
+.frame-area {
+	flex: 1;
+	min-height: 0;
 	padding: 24px;
 	border: 1px solid var(--border);
 	border-radius: 12px;
 	background:
 		radial-gradient(circle at center, rgba(162, 85, 255, 0.1) 0%, transparent 52%),
+	background: radial-gradient(
+			circle at center,
+			rgba(162, 85, 255, 0.1) 0%,
+			transparent 52%
+		),
 		linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 65%),
 		var(--panel);
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
+}
+
+.frame-area {
+	display: none;
+	padding: 0;
+	overflow: hidden;
 }
 
 .logo-wrapper {
@@ -144,6 +130,7 @@ body {
 	margin: 12px 0 8px;
 	font-size: 34px;
 	text-shadow: 0 0 22px rgba(174, 95, 255, 0.4);
+	margin: auto;
 }
 
 .logo-wrapper p {
@@ -155,11 +142,28 @@ body {
 #sj-frame {
 	border: 1px solid var(--border);
 	border-radius: 12px;
+.proxy-frame {
+	display: none;
 	width: 100%;
 	flex: 1;
 	min-height: 0;
+	height: 100%;
+	border: 0;
 	background: #fff;
 	box-shadow: 0 0 24px rgba(174, 95, 255, 0.16);
+}
+
+.proxy-frame.active {
+	display: block;
+}
+
+body.fullscreen-mode .browser-shell {
+	padding: 0;
+	gap: 0;
+}
+
+body.fullscreen-mode .browser-topbar {
+	display: none;
 }
 
 .error-area {
