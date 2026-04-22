@@ -101,8 +101,11 @@ function renderTabs() {
 	tabsEl.innerHTML = "";
 
 	for (const tab of tabs) {
+		const tabItem = document.createElement("div");
+		tabItem.className = `tab-item${tab.id === activeTabId ? " active" : ""}`;
+
 		const tabBtn = document.createElement("button");
-		tabBtn.className = `tab-btn${tab.id === activeTabId ? " active" : ""}`;
+		tabBtn.className = "tab-btn";
 		tabBtn.type = "button";
 		tabBtn.role = "tab";
 		tabBtn.dataset.tabId = tab.id;
@@ -111,6 +114,7 @@ function renderTabs() {
 		const title = document.createElement("span");
 		title.className = "tab-title";
 		title.textContent = tab.title;
+		tabBtn.append(title);
 
 		const close = document.createElement("button");
 		close.className = "tab-close";
@@ -119,8 +123,8 @@ function renderTabs() {
 		close.title = "Close tab";
 		close.dataset.tabId = tab.id;
 
-		tabBtn.append(title, close);
-		tabsEl.append(tabBtn);
+		tabItem.append(tabBtn, close);
+		tabsEl.append(tabItem);
 	}
 }
 
@@ -133,7 +137,10 @@ function switchToTab(tabId) {
 	activeTabId = tabId;
 
 	for (const candidate of tabs) {
-		candidate.frame.classList.toggle("active", candidate.id === tabId);
+		if (!candidate.frame) {
+			continue;
+		}
+		candidate.frame.frame.classList.toggle("active", candidate.id === tabId);
 	}
 
 	address.value = tab.url;
@@ -148,7 +155,9 @@ function closeTab(tabId) {
 	}
 
 	const [tab] = tabs.splice(index, 1);
-	tab.frame.remove();
+	if (tab.frame) {
+		tab.frame.frame.remove();
+	}
 
 	if (tabs.length === 0) {
 		createTab();
@@ -163,25 +172,24 @@ function closeTab(tabId) {
 	}
 }
 
-function attachNewTabInterception(tab) {
-	const { frame } = tab;
+function interceptNewTabBehavior(tab) {
+	if (!tab.frame) {
+		return;
+	}
+
+	const frameEl = tab.frame.frame;
 	const bindInterception = () => {
 		try {
-			const frameWindow = frame.contentWindow;
-			if (!frameWindow || !frameWindow.document) {
+			const frameWindow = frameEl.contentWindow;
+			if (!frameWindow || !frameWindow.document || frameWindow.__sjTabInterceptApplied) {
 				return;
 			}
 
-			if (frameWindow.__sjTabInterceptApplied) {
-				return;
-			}
 			frameWindow.__sjTabInterceptApplied = true;
-
 			const originalOpen = frameWindow.open.bind(frameWindow);
 			frameWindow.open = (url = "", target = "_blank", features) => {
 				if (target === "_blank" || target === "" || target === null) {
-					const destination = String(url || frameWindow.location.href);
-					openInNewTab(destination);
+					openInNewTab(String(url || frameWindow.location.href));
 					return frameWindow;
 				}
 				return originalOpen(url, target, features);
@@ -190,6 +198,10 @@ function attachNewTabInterception(tab) {
 			frameWindow.document.addEventListener(
 				"click",
 				(event) => {
+					if (!(event.target instanceof Element)) {
+						return;
+					}
+
 					const link = event.target.closest("a[target='_blank']");
 					if (!link || !link.href) {
 						return;
@@ -201,28 +213,34 @@ function attachNewTabInterception(tab) {
 				true,
 			);
 		} catch {
-			// Cross-origin safeguards may prevent direct interception on some pages.
+			// Some pages may block direct interception.
 		}
 	};
 
-	frame.addEventListener("load", bindInterception);
+	frameEl.addEventListener("load", bindInterception);
+}
+
+function ensureTabFrame(tab) {
+	if (tab.frame) {
+		return;
+	}
+
+	createFrameHost();
+	tab.frame = scramjet.createFrame();
+	tab.frame.frame.classList.add("sj-frame");
+	frameHost.append(tab.frame.frame);
+	interceptNewTabBehavior(tab);
 }
 
 function createTab(initialUrl = "") {
-	createFrameHost();
-
 	const tab = {
 		id: String(++tabIdCounter),
 		title: "New Tab",
 		url: "",
 		history: [],
 		historyIndex: -1,
-		frame: scramjet.createFrame().frame,
+		frame: null,
 	};
-
-	tab.frame.classList.add("sj-frame");
-	frameHost.append(tab.frame);
-	attachNewTabInterception(tab);
 
 	tabs.push(tab);
 	renderTabs();
@@ -237,6 +255,7 @@ function createTab(initialUrl = "") {
 
 async function ensureTransportReady() {
 	let wispUrl =
+	const wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") +
 		"://" +
 		location.host +
@@ -254,8 +273,7 @@ function ensureFrame() {
 		landing.replaceWith(frame.frame);
 	}
 function openInNewTab(destination) {
-	const tab = createTab(destination);
-	switchToTab(tab.id);
+	createTab(destination);
 }
 
 async function navigate(inputValue, pushHistory = true) {
@@ -284,6 +302,8 @@ async function navigate(inputValue, pushHistory = true, targetTabId = activeTabI
 	currentUrl = destination;
 	address.value = destination;
 	frame.go(destination);
+	ensureTabFrame(tab);
+
 	tab.url = destination;
 	tab.title = tabLabel(destination);
 
@@ -296,13 +316,15 @@ async function navigate(inputValue, pushHistory = true, targetTabId = activeTabI
 		tab.historyIndex = tab.history.length - 1;
 	}
 
+	tab.frame.go(destination);
+
 	if (activeTabId === tab.id) {
 		address.value = destination;
 	}
 
-	tab.frame.src = destination;
 	updateNavState();
 	renderTabs();
+	switchToTab(tab.id);
 }
 
 form.addEventListener("submit", async (event) => {
@@ -339,12 +361,12 @@ forwardBtn.addEventListener("click", async () => {
 reloadBtn.addEventListener("click", () => {
 	if (!frame || !currentUrl) {
 	const tab = getActiveTab();
-	if (!tab || !tab.url) {
+	if (!tab || !tab.frame || !tab.url) {
 		return;
 	}
 
 	frame.go(currentUrl);
-	tab.frame.src = tab.url;
+	tab.frame.go(tab.url);
 });
 
 fullscreenBtn.addEventListener("click", async () => {
@@ -361,6 +383,10 @@ newTabBtn.addEventListener("click", () => {
 });
 
 tabsEl.addEventListener("click", (event) => {
+	if (!(event.target instanceof Element)) {
+		return;
+	}
+
 	const closeBtn = event.target.closest(".tab-close");
 	if (closeBtn) {
 		event.stopPropagation();
