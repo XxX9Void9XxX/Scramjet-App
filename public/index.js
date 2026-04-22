@@ -28,6 +28,7 @@ const tabsList = document.getElementById("sj-tabs");
 const newTabButton = document.getElementById("sj-new-tab");
 const landing = document.getElementById("landing");
 const frameArea = document.getElementById("sj-frame-area");
+const autoclickerButton = document.getElementById("sj-autoclicker");
 
 const { ScramjetController } = $scramjetLoadController();
 
@@ -216,6 +217,49 @@ function createTab(initialUrl = "", activate = true) {
 	return tab;
 }
 
+function runAutoClickerInFrame(frameWindow) {
+	const delayInput = frameWindow.prompt(
+		"Directions:\n 1. Enter CPS\n 2. Click an element\n 3. Click the same spot to stop.\n\nEnter CPS (0 to cancel):"
+	);
+	const cps = Number(delayInput);
+	if (!Number.isFinite(cps) || cps <= 0) return;
+
+	const delay = 1000 / cps;
+	const style = frameWindow.document.createElement("style");
+	style.textContent = "*{cursor: crosshair !important;}";
+	frameWindow.document.body.appendChild(style);
+
+	const addClicker = (event) => {
+		if (!event.isTrusted) return;
+
+		frameWindow.document.body.removeChild(style);
+		frameWindow.document.body.removeEventListener("click", addClicker, true);
+		event.preventDefault();
+
+		const target = event.target;
+		target.classList.add("auto-clicker-target");
+
+		const toggle = (clickEvent) => {
+			if (!clickEvent.isTrusted) return;
+			target.classList.toggle("auto-clicker-active");
+			if (target.classList.contains("auto-clicker-active")) {
+				autoClick(target);
+			}
+			clickEvent.preventDefault();
+		};
+
+		target.addEventListener("click", toggle);
+	};
+
+	function autoClick(element) {
+		if (!element.classList.contains("auto-clicker-active")) return;
+		element.click();
+		frameWindow.setTimeout(() => autoClick(element), delay);
+	}
+
+	frameWindow.document.body.addEventListener("click", addClicker, true);
+}
+
 async function navigateActiveTab(inputValue) {
 	const target = getActiveTab() || createTab("", true);
 	const requested = inputValue.trim();
@@ -255,6 +299,21 @@ newTabButton.addEventListener("click", () => {
 		await connection.setTransport("/libcurl/index.mjs", [
 			{ websocket: wispUrl },
 		]);
+autoclickerButton?.addEventListener("click", () => {
+	const active = getActiveTab();
+	if (!active?.frameElement?.contentWindow) {
+		error.textContent = "Open a page first, then run autoclicker.";
+		return;
+	}
+
+	try {
+		runAutoClickerInFrame(active.frameElement.contentWindow);
+	} catch (err) {
+		error.textContent = "AutoClicker could not start on this page.";
+		errorCode.textContent = err.toString();
+	}
+});
+
 backButton.addEventListener("click", () => {
 	const active = getActiveTab();
 	active?.frameElement?.contentWindow?.history?.back();
