@@ -1,5 +1,4 @@
-@@ -19,92 +19,152 @@
-
+@@ -20,91 +20,158 @@
 html,
 body {
 	margin: 0;
@@ -26,8 +25,6 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	flex-direction: column;
-	gap: 10px;
 	padding: 10px;
 	border: 1px solid var(--border);
 	border-radius: 12px;
@@ -42,6 +39,14 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: linear-gradient(180deg, #1f0f2d 0%, var(--panel) 100%);
+	box-shadow:
+		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
+		0 0 24px rgba(168, 71, 255, 0.2),
+		0 10px 20px rgba(0, 0, 0, 0.35);
 }
 
 .tabs {
@@ -154,7 +159,7 @@ body {
 }
 
 #sj-address:focus {
-@@ -130,52 +190,62 @@ body {
+@@ -130,52 +197,62 @@ body {
 }
 
 .logo-wrapper {
