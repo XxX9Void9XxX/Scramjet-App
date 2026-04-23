@@ -22,6 +22,12 @@ const fullscreenBtn = document.getElementById("sj-fullscreen");
 const landing = document.getElementById("landing");
 /** @type {HTMLElement} */
 const browserShell = document.getElementById("browser-shell");
+/** @type {HTMLElement} */
+const viewHost = document.getElementById("sj-view-host");
+/** @type {HTMLElement} */
+const tabstrip = document.getElementById("sj-tabstrip");
+/** @type {HTMLButtonElement} */
+const newTabBtn = document.getElementById("sj-new-tab");
 
 const { ScramjetController } = $scramjetLoadController();
 
@@ -36,10 +42,10 @@ const scramjet = new ScramjetController({
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-let frame = null;
-let currentUrl = "";
-const historyStack = [];
-let historyIndex = -1;
+
+/** @type {Array<{id: string,title: string,currentUrl: string,historyStack: string[],historyIndex: number,frame: any,button: HTMLButtonElement,popupBound: boolean}>} */
+const tabs = [];
+let activeTabId = null;
 
 function clearErrors() {
 	error.textContent = "";
@@ -51,9 +57,202 @@ function showError(message, code = "") {
 	errorCode.textContent = code;
 }
 
+function currentTab() {
+	return tabs.find((tab) => tab.id === activeTabId) ?? null;
+}
+
+function labelFromUrl(url) {
+	if (!url) {
+		return "New Tab";
+	}
+
+	try {
+		const parsed = new URL(url);
+		return parsed.hostname || parsed.href;
+	} catch (err) {
+		return url;
+	}
+}
+
+function updateTabButton(tab) {
+	const titleNode = tab.button.querySelector(".tab-title");
+	if (titleNode) {
+		titleNode.textContent = tab.title;
+	}
+	if (tab.id === activeTabId) {
+		tab.button.classList.add("active");
+		tab.button.setAttribute("aria-selected", "true");
+	} else {
+		tab.button.classList.remove("active");
+		tab.button.setAttribute("aria-selected", "false");
+	}
+}
+
 function updateNavState() {
-	backBtn.disabled = historyIndex <= 0;
-	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
+	const tab = currentTab();
+	if (!tab) {
+		backBtn.disabled = true;
+		forwardBtn.disabled = true;
+		reloadBtn.disabled = true;
+		address.value = "";
+		return;
+	}
+
+	backBtn.disabled = tab.historyIndex <= 0;
+	forwardBtn.disabled = tab.historyIndex >= tab.historyStack.length - 1;
+	reloadBtn.disabled = !tab.currentUrl;
+	address.value = tab.currentUrl || "";
+}
+
+function setLandingVisible(visible) {
+	landing.classList.toggle("active", visible);
+	landing.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
+function activateTab(tabId) {
+	activeTabId = tabId;
+
+	for (const tab of tabs) {
+		tab.frame.frame.classList.toggle("active", tab.id === activeTabId);
+		updateTabButton(tab);
+	}
+
+	const active = currentTab();
+	setLandingVisible(!active || !active.currentUrl);
+	updateNavState();
+}
+
+function removeTab(tabId) {
+	const index = tabs.findIndex((tab) => tab.id === tabId);
+	if (index === -1) {
+		return;
+	}
+
+	const [tab] = tabs.splice(index, 1);
+	tab.frame.frame.remove();
+	tab.button.remove();
+
+	if (tabs.length === 0) {
+		createTab();
+		return;
+	}
+
+	if (activeTabId === tabId) {
+		const nextTab = tabs[Math.max(0, index - 1)] ?? tabs[0];
+		activateTab(nextTab.id);
+	} else {
+		updateNavState();
+	}
+}
+
+function createTabButton(tab) {
+	const button = document.createElement("button");
+	button.type = "button";
+	button.className = "tab";
+	button.setAttribute("role", "tab");
+	button.innerHTML = `<span class="tab-title"></span><span class="tab-close" aria-label="Close tab">✕</span>`;
+
+	button.addEventListener("click", (event) => {
+		const closeBtn =
+			event.target instanceof Element
+				? event.target.closest(".tab-close")
+				: null;
+		if (closeBtn) {
+			event.stopPropagation();
+			removeTab(tab.id);
+			return;
+		}
+		activateTab(tab.id);
+	});
+
+	tabstrip.appendChild(button);
+	return button;
+}
+
+function bindPopupInterception(tab) {
+	if (tab.popupBound || !tab.frame?.frame) {
+		return;
+	}
+
+	const proxyFrame = tab.frame.frame;
+	proxyFrame.addEventListener("load", () => {
+		let frameWindow;
+		let frameDocument;
+		try {
+			frameWindow = proxyFrame.contentWindow;
+			frameDocument = frameWindow?.document;
+		} catch (err) {
+			return;
+		}
+
+		if (!frameWindow) {
+			return;
+		}
+
+		const originalOpen = frameWindow.open?.bind(frameWindow);
+		if (originalOpen && !frameWindow.__tempestOpenWrapped) {
+			frameWindow.open = (url = "", target = "_blank", features = "") => {
+				if (!target || target === "_blank") {
+					createTab(url || "about:blank", true);
+					return null;
+				}
+				return originalOpen(url, target, features);
+			};
+			frameWindow.__tempestOpenWrapped = true;
+		}
+
+		if (frameDocument && !frameDocument.__tempestBlankIntercepted) {
+			frameDocument.addEventListener("click", (event) => {
+				const anchor =
+					event.target instanceof Element
+						? event.target.closest("a[target='_blank']")
+						: null;
+				if (!anchor || !anchor.href) {
+					return;
+				}
+				event.preventDefault();
+				createTab(anchor.href, true);
+			});
+			frameDocument.__tempestBlankIntercepted = true;
+		}
+
+		if (frameDocument?.title) {
+			tab.title = frameDocument.title;
+			updateTabButton(tab);
+		}
+	});
+
+	tab.popupBound = true;
+}
+
+function createTab(startUrl = "", activate = true) {
+	const tab = {
+		id: `tab-${crypto.randomUUID()}`,
+		title: "New Tab",
+		currentUrl: "",
+		historyStack: [],
+		historyIndex: -1,
+		frame: scramjet.createFrame(),
+		button: null,
+		popupBound: false,
+	};
+
+	tab.frame.frame.classList.add("tab-frame");
+	viewHost.appendChild(tab.frame.frame);
+	tab.button = createTabButton(tab);
+	tabs.push(tab);
+	bindPopupInterception(tab);
+	updateTabButton(tab);
+
+	if (activate) {
+		activateTab(tab.id);
+	}
+
+	if (startUrl) {
+		navigate(startUrl, true, tab);
+	}
+
+	return tab;
 }
 
 async function ensureTransportReady() {
@@ -70,17 +269,13 @@ async function ensureTransportReady() {
 	}
 }
 
-function ensureFrame() {
-	if (!frame) {
-		frame = scramjet.createFrame();
-		frame.frame.id = "sj-frame";
-		landing.replaceWith(frame.frame);
-		browserShell.classList.add("is-browsing");
-	}
-}
-
-async function navigate(inputValue, pushHistory = true) {
+async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	if (!inputValue.trim()) {
+		return;
+	}
+
+	const tab = explicitTab ?? currentTab();
+	if (!tab) {
 		return;
 	}
 
@@ -98,17 +293,19 @@ async function navigate(inputValue, pushHistory = true) {
 	}
 
 	const destination = search(inputValue, searchEngine.value);
-	ensureFrame();
-	currentUrl = destination;
-	address.value = destination;
-	frame.go(destination);
+	tab.currentUrl = destination;
+	tab.title = labelFromUrl(destination);
+	tab.frame.go(destination);
 
 	if (pushHistory) {
-		historyStack.splice(historyIndex + 1);
-		historyStack.push(destination);
-		historyIndex = historyStack.length - 1;
+		tab.historyStack.splice(tab.historyIndex + 1);
+		tab.historyStack.push(destination);
+		tab.historyIndex = tab.historyStack.length - 1;
 	}
 
+	browserShell.classList.add("is-browsing");
+	setLandingVisible(tab.id !== activeTabId || !tab.currentUrl);
+	updateTabButton(tab);
 	updateNavState();
 }
 
@@ -117,30 +314,38 @@ form.addEventListener("submit", async (event) => {
 	await navigate(address.value, true);
 });
 
+newTabBtn.addEventListener("click", () => {
+	createTab("", true);
+	clearErrors();
+});
+
 backBtn.addEventListener("click", async () => {
-	if (historyIndex <= 0) {
+	const tab = currentTab();
+	if (!tab || tab.historyIndex <= 0) {
 		return;
 	}
 
-	historyIndex -= 1;
-	await navigate(historyStack[historyIndex], false);
+	tab.historyIndex -= 1;
+	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
 
 forwardBtn.addEventListener("click", async () => {
-	if (historyIndex >= historyStack.length - 1) {
+	const tab = currentTab();
+	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) {
 		return;
 	}
 
-	historyIndex += 1;
-	await navigate(historyStack[historyIndex], false);
+	tab.historyIndex += 1;
+	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
 
 reloadBtn.addEventListener("click", () => {
-	if (!frame || !currentUrl) {
+	const tab = currentTab();
+	if (!tab || !tab.currentUrl) {
 		return;
 	}
 
-	frame.go(currentUrl);
+	tab.frame.go(tab.currentUrl);
 });
 
 async function enterFullscreen(element) {
@@ -164,4 +369,6 @@ fullscreenBtn.addEventListener("click", async () => {
 	await document.exitFullscreen();
 });
 
+createTab();
+activateTab(tabs[0].id);
 updateNavState();
