@@ -21,6 +21,23 @@
 	<body>
 		<div id="browser-shell" class="browser-shell">
 			<header class="browser-topbar">
+				<div class="tabstrip-wrapper">
+					<div
+						id="sj-tabstrip"
+						class="tabstrip"
+						role="tablist"
+						aria-label="Tabs"
+					></div>
+					<button
+						id="sj-new-tab"
+						class="new-tab-btn"
+						type="button"
+						title="New tab"
+					>
+						+
+					</button>
+				</div>
+
 				<form id="sj-form" class="toolbar" autocomplete="off">
 					<input
 						id="sj-search-engine"
@@ -30,10 +47,20 @@
 					<button id="sj-back" class="toolbar-btn" type="button" title="Back">
 						&#8592;
 					</button>
-					<button id="sj-forward" class="toolbar-btn" type="button" title="Forward">
+					<button
+						id="sj-forward"
+						class="toolbar-btn"
+						type="button"
+						title="Forward"
+					>
 						&#8594;
 					</button>
-					<button id="sj-reload" class="toolbar-btn" type="button" title="Reload">
+					<button
+						id="sj-reload"
+						class="toolbar-btn"
+						type="button"
+						title="Reload"
+					>
 						&#10227;
 					</button>
 					<button
@@ -54,11 +81,13 @@
 				</form>
 			</header>
 
-			<main id="landing" class="landing">
-				<div title="SSP Logo" class="logo-wrapper">
-					<img class="logo" src="tempest.png" alt="Tempest Proxy" />
-					<h1>Tempest Proxy</h1>
-				</div>
+			<main id="sj-view-host" class="view-host">
+				<section id="landing" class="landing" aria-hidden="false">
+					<div title="SSP Logo" class="logo-wrapper">
+						<img class="logo" src="tempest.png" alt="Tempest Proxy" />
+						<h1>Tempest Proxy</h1>
+					</div>
+				</section>
 			</main>
 
 			<div class="error-area" aria-live="polite">
