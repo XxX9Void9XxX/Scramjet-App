@@ -18,16 +18,10 @@ const forwardBtn = document.getElementById("sj-forward");
 const reloadBtn = document.getElementById("sj-reload");
 /** @type {HTMLButtonElement} */
 const fullscreenBtn = document.getElementById("sj-fullscreen");
-/** @type {HTMLButtonElement} */
-const newTabBtn = document.getElementById("sj-new-tab");
-/** @type {HTMLElement} */
-const tabsEl = document.getElementById("sj-tabs");
 /** @type {HTMLElement} */
 const landing = document.getElementById("landing");
 
 const { ScramjetController } = $scramjetLoadController();
-let scramjet = null;
-let connection = null;
 
 const scramjet = new ScramjetController({
 	files: {
@@ -36,50 +30,33 @@ const scramjet = new ScramjetController({
 		sync: "/scram/scramjet.sync.js",
 	},
 });
-function getScramjet() {
-	if (scramjet) {
-		return scramjet;
-	}
+var form = document.getElementById("sj-form");
+var address = document.getElementById("sj-address");
+var searchEngine = document.getElementById("sj-search-engine");
+var error = document.getElementById("sj-error");
+var errorCode = document.getElementById("sj-error-code");
+var backBtn = document.getElementById("sj-back");
+var forwardBtn = document.getElementById("sj-forward");
+var reloadBtn = document.getElementById("sj-reload");
+var fullscreenBtn = document.getElementById("sj-fullscreen");
+var newTabBtn = document.getElementById("sj-new-tab");
+var tabsEl = document.getElementById("sj-tabs");
+var landing = document.getElementById("landing");
 
 scramjet.init();
-	if (typeof $scramjetLoadController !== "function") {
-		throw new Error("Scramjet controller script failed to load.");
-	}
-
-	const { ScramjetController } = $scramjetLoadController();
-	scramjet = new ScramjetController({
-		files: {
-			wasm: "/scram/scramjet.wasm.wasm",
-			all: "/scram/scramjet.all.js",
-			sync: "/scram/scramjet.sync.js",
-		},
-	});
+var scramjet = null;
+var connection = null;
+var frameController = null;
+var frameHost = null;
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 let frame = null;
 let currentUrl = "";
 const historyStack = [];
 let historyIndex = -1;
-	scramjet.init();
-	return scramjet;
-}
-
-function getConnection() {
-	if (connection) {
-		return connection;
-	}
-
-	if (!window.BareMux || !window.BareMux.BareMuxConnection) {
-		throw new Error("BareMux script failed to load.");
-	}
-
-	connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-	return connection;
-}
-const tabs = [];
-let activeTabId = null;
-let tabIdCounter = 0;
-let frameHost = null;
+var tabs = [];
+var tabCounter = 0;
+var activeTabId = null;
 
 function clearErrors() {
 	error.textContent = "";
@@ -87,44 +64,47 @@ function clearErrors() {
 }
 
 function showError(message, code = "") {
+function showError(message, code) {
 	error.textContent = message;
 	errorCode.textContent = code;
+	errorCode.textContent = code || "";
+}
+
+function getScramjet() {
+	if (scramjet) return scramjet;
+	if (typeof $scramjetLoadController !== "function") {
+		throw new Error("Scramjet controller script failed to load.");
+	}
+	var controller = $scramjetLoadController();
+	scramjet = new controller.ScramjetController({
+		files: {
+			wasm: "/scram/scramjet.wasm.wasm",
+			all: "/scram/scramjet.all.js",
+			sync: "/scram/scramjet.sync.js",
+		},
+	});
+	scramjet.init();
+	return scramjet;
+}
+
+function getConnection() {
+	if (connection) return connection;
+	if (!window.BareMux || !window.BareMux.BareMuxConnection) {
+		throw new Error("BareMux script failed to load.");
+	}
+	connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+	return connection;
 }
 
 function getActiveTab() {
-	const active = tabs.find((tab) => tab.id === activeTabId);
-	return active ? active : null;
+	for (var i = 0; i < tabs.length; i += 1) {
+		if (tabs[i].id === activeTabId) return tabs[i];
+	}
+	return null;
 }
 
-function updateNavState() {
-	backBtn.disabled = historyIndex <= 0;
-	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
-	const tab = getActiveTab();
-	if (!tab) {
-		backBtn.disabled = true;
-		forwardBtn.disabled = true;
-		return;
-	}
-
-	backBtn.disabled = tab.historyIndex <= 0;
-	forwardBtn.disabled = tab.historyIndex >= tab.history.length - 1;
-}
-
-function createFrameHost() {
-	if (frameHost) {
-		return;
-	}
-
-	frameHost = document.createElement("div");
-	frameHost.id = "sj-frame-host";
-	landing.replaceWith(frameHost);
-}
-
-function tabLabel(url) {
-	if (!url) {
-		return "New Tab";
-	}
-
+function labelForUrl(url) {
+	if (!url) return "New Tab";
 	try {
 		return new URL(url).hostname;
 	} catch (err) {
@@ -132,175 +112,49 @@ function tabLabel(url) {
 	}
 }
 
-function renderTabs() {
-	tabsEl.innerHTML = "";
-
-	for (const tab of tabs) {
-		const tabItem = document.createElement("div");
-		tabItem.className = `tab-item${tab.id === activeTabId ? " active" : ""}`;
-
-		const tabBtn = document.createElement("button");
-		tabBtn.className = "tab-btn";
-		tabBtn.type = "button";
-		tabBtn.role = "tab";
-		tabBtn.dataset.tabId = tab.id;
-		tabBtn.title = tab.url || "New Tab";
-
-		const title = document.createElement("span");
-		title.className = "tab-title";
-		title.textContent = tab.title;
-		tabBtn.append(title);
-
-		const close = document.createElement("button");
-		close.className = "tab-close";
-		close.type = "button";
-		close.innerHTML = "&times;";
-		close.title = "Close tab";
-		close.dataset.tabId = tab.id;
-
-		tabItem.append(tabBtn, close);
-		tabsEl.append(tabItem);
-	}
-}
-
-function switchToTab(tabId) {
-	const tab = tabs.find((candidate) => candidate.id === tabId);
+function updateNavState() {
+	backBtn.disabled = historyIndex <= 0;
+	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
+	var tab = getActiveTab();
 	if (!tab) {
+		backBtn.disabled = true;
+		forwardBtn.disabled = true;
 		return;
 	}
-
-	activeTabId = tabId;
-
-	for (const candidate of tabs) {
-		if (!candidate.frame) {
-			continue;
-		}
-		candidate.frame.frame.classList.toggle("active", candidate.id === tabId);
-	}
-
-	address.value = tab.url;
-	updateNavState();
-	renderTabs();
-}
-
-function closeTab(tabId) {
-	const index = tabs.findIndex((tab) => tab.id === tabId);
-	if (index < 0) {
-		return;
-	}
-
-	const [tab] = tabs.splice(index, 1);
-	if (tab.frame) {
-		tab.frame.frame.remove();
-	}
-
-	if (tabs.length === 0) {
-		createTab();
-		return;
-	}
-
-	if (activeTabId === tabId) {
-		const fallbackTab = tabs[Math.max(0, index - 1)];
-		switchToTab(fallbackTab.id);
-	} else {
-		renderTabs();
-	}
-}
-
-function interceptNewTabBehavior(tab) {
-	if (!tab.frame) {
-		return;
-	}
-
-	const frameEl = tab.frame.frame;
-	const bindInterception = () => {
-		try {
-			const frameWindow = frameEl.contentWindow;
-			if (!frameWindow || !frameWindow.document || frameWindow.__sjTabInterceptApplied) {
-				return;
-			}
-
-			frameWindow.__sjTabInterceptApplied = true;
-			const originalOpen = frameWindow.open.bind(frameWindow);
-			frameWindow.open = (url = "", target = "_blank", features) => {
-				if (target === "_blank" || target === "" || target === null) {
-					openInNewTab(String(url || frameWindow.location.href));
-					return frameWindow;
-				}
-				return originalOpen(url, target, features);
-			};
-
-			frameWindow.document.addEventListener(
-				"click",
-				(event) => {
-					if (!(event.target instanceof Element)) {
-						return;
-					}
-
-					const link = event.target.closest("a[target='_blank']");
-					if (!link || !link.href) {
-						return;
-					}
-
-					event.preventDefault();
-					openInNewTab(link.href);
-				},
-				true,
-			);
-		} catch (err) {
-			// Some pages may block direct interception.
-		}
-	};
-
-	frameEl.addEventListener("load", bindInterception);
-}
-
-function ensureTabFrame(tab) {
-	if (tab.frame) {
-		return;
-	}
-
-	createFrameHost();
-	tab.frame = getScramjet().createFrame();
-	tab.frame.frame.classList.add("sj-frame");
-	frameHost.append(tab.frame.frame);
-	interceptNewTabBehavior(tab);
-}
-
-function createTab(initialUrl = "") {
-	const tab = {
-		id: String(++tabIdCounter),
-		title: "New Tab",
-		url: "",
-		history: [],
-		historyIndex: -1,
-		frame: null,
-	};
-
-	tabs.push(tab);
-	renderTabs();
-	switchToTab(tab.id);
-
-	if (initialUrl) {
-		navigate(initialUrl, true, tab.id);
-	}
-
-	return tab;
+	backBtn.disabled = tab.historyIndex <= 0;
+	forwardBtn.disabled = tab.historyIndex >= tab.history.length - 1;
 }
 
 async function ensureTransportReady() {
 	let wispUrl =
-	const wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") +
 		"://" +
 		location.host +
 		"/wisp/";
+function renderTabs() {
+	tabsEl.innerHTML = "";
+	for (var i = 0; i < tabs.length; i += 1) {
+		var tab = tabs[i];
+		var item = document.createElement("div");
+		item.className = "tab-item" + (tab.id === activeTabId ? " active" : "");
+
+		var tabBtn = document.createElement("button");
+		tabBtn.type = "button";
+		tabBtn.className = "tab-btn";
+		tabBtn.dataset.tabId = tab.id;
+		tabBtn.textContent = tab.title;
 
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
-	const muxConnection = getConnection();
-	if ((await muxConnection.getTransport()) !== "/libcurl/index.mjs") {
-		await muxConnection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+		var closeBtn = document.createElement("button");
+		closeBtn.type = "button";
+		closeBtn.className = "tab-close";
+		closeBtn.dataset.tabId = tab.id;
+		closeBtn.innerHTML = "&times;";
+
+		item.appendChild(tabBtn);
+		item.appendChild(closeBtn);
+		tabsEl.appendChild(item);
 	}
 }
 
@@ -309,29 +163,140 @@ function ensureFrame() {
 		frame = scramjet.createFrame();
 		frame.frame.id = "sj-frame";
 		landing.replaceWith(frame.frame);
+function createFrame() {
+	if (frameController) return;
+	frameHost = document.createElement("div");
+	frameHost.id = "sj-frame-host";
+	landing.replaceWith(frameHost);
+
+	frameController = getScramjet().createFrame();
+	frameController.frame.classList.add("sj-frame", "active");
+	frameHost.appendChild(frameController.frame);
+	installNewTabInterceptors();
+}
+
+function installNewTabInterceptors() {
+	if (!frameController) return;
+	frameController.frame.addEventListener("load", function () {
+		try {
+			var win = frameController.frame.contentWindow;
+			if (!win || !win.document || win.__sjTabsInstalled) return;
+			win.__sjTabsInstalled = true;
+			var originalOpen = win.open.bind(win);
+			win.open = function (url, target, features) {
+				if (!target || target === "_blank") {
+					openInNewTab(String(url || win.location.href));
+					return win;
+				}
+				return originalOpen(url, target, features);
+			};
+			win.document.addEventListener("click", function (event) {
+				var targetEl = event.target;
+				if (!targetEl || typeof targetEl.closest !== "function") return;
+				var link = targetEl.closest("a[target='_blank']");
+				if (!link || !link.href) return;
+				event.preventDefault();
+				openInNewTab(link.href);
+			}, true);
+		} catch (err) {
+			// Ignore cross-origin access restrictions.
+		}
+	});
+}
+
+function createTab(initialUrl) {
+	var tab = {
+		id: String(++tabCounter),
+		title: "New Tab",
+		url: "",
+		history: [],
+		historyIndex: -1,
+	};
+	tabs.push(tab);
+	activeTabId = tab.id;
+	renderTabs();
+	updateNavState();
+	address.value = "";
+	if (initialUrl) {
+		navigate(initialUrl, true, tab.id);
 	}
-function openInNewTab(destination) {
-	createTab(destination);
+	return tab;
 }
 
 async function navigate(inputValue, pushHistory = true) {
-async function navigate(inputValue, pushHistory = true, targetTabId = activeTabId) {
 	if (!inputValue.trim()) {
+function closeTab(tabId) {
+	if (tabs.length === 1) {
+		tabs[0].history = [];
+		tabs[0].historyIndex = -1;
+		tabs[0].url = "";
+		tabs[0].title = "New Tab";
+		address.value = "";
+		renderTabs();
+		updateNavState();
 		return;
 	}
-
-	const tab = tabs.find((candidate) => candidate.id === targetTabId);
-	if (!tab) {
-		return;
+	var index = -1;
+	for (var i = 0; i < tabs.length; i += 1) {
+		if (tabs[i].id === tabId) {
+			index = i;
+			break;
+		}
 	}
+	if (index < 0) return;
+	tabs.splice(index, 1);
+	if (activeTabId === tabId) {
+		activeTabId = tabs[Math.max(0, index - 1)].id;
+	}
+	renderTabs();
+	switchTab(activeTabId);
+}
 
+function switchTab(tabId) {
+	activeTabId = tabId;
+	var tab = getActiveTab();
+	if (!tab) return;
+	address.value = tab.url;
+	renderTabs();
+	updateNavState();
+	if (tab.url) {
+		if (!frameController) createFrame();
+		frameController.go(tab.url);
+	}
+}
+
+async function ensureTransportReady() {
+	var wispUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
+	var mux = getConnection();
+	if ((await mux.getTransport()) !== "/libcurl/index.mjs") {
+		await mux.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+	}
+}
+
+function openInNewTab(url) {
+	createTab(url);
+}
+
+async function navigate(inputValue, pushHistory, targetTabId) {
+	var value = (inputValue || "").trim();
+	if (!value) return;
 	clearErrors();
+
+	var tab = null;
+	for (var i = 0; i < tabs.length; i += 1) {
+		if (tabs[i].id === targetTabId) {
+			tab = tabs[i];
+			break;
+		}
+	}
+	if (!tab) return;
 
 	try {
 		await registerSW();
 		await ensureTransportReady();
 	} catch (err) {
 		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
+		showError("Failed to initialize Scramjet service worker/transport.", String(err));
 		return;
 	}
 
@@ -340,10 +305,9 @@ async function navigate(inputValue, pushHistory = true, targetTabId = activeTabI
 	currentUrl = destination;
 	address.value = destination;
 	frame.go(destination);
-	ensureTabFrame(tab);
-
+	var destination = search(value, searchEngine.value);
 	tab.url = destination;
-	tab.title = tabLabel(destination);
+	tab.title = labelForUrl(destination);
 
 	if (pushHistory) {
 		historyStack.splice(historyIndex + 1);
@@ -354,94 +318,88 @@ async function navigate(inputValue, pushHistory = true, targetTabId = activeTabI
 		tab.historyIndex = tab.history.length - 1;
 	}
 
-	tab.frame.go(destination);
-
-	if (activeTabId === tab.id) {
-		address.value = destination;
-	}
-
-	updateNavState();
+	if (!frameController) createFrame();
+	frameController.go(destination);
+	address.value = destination;
 	renderTabs();
-	switchToTab(tab.id);
+	updateNavState();
 }
 
 form.addEventListener("submit", async (event) => {
+form.addEventListener("submit", function (event) {
 	event.preventDefault();
 	await navigate(address.value, true);
+	var tab = getActiveTab();
+	if (!tab) return;
+	navigate(address.value, true, tab.id);
 });
 
 backBtn.addEventListener("click", async () => {
 	if (historyIndex <= 0) {
-	const tab = getActiveTab();
-	if (!tab || tab.historyIndex <= 0) {
 		return;
 	}
 
 	historyIndex -= 1;
 	await navigate(historyStack[historyIndex], false);
+backBtn.addEventListener("click", function () {
+	var tab = getActiveTab();
+	if (!tab || tab.historyIndex <= 0) return;
 	tab.historyIndex -= 1;
-	await navigate(tab.history[tab.historyIndex], false, tab.id);
+	navigate(tab.history[tab.historyIndex], false, tab.id);
 });
 
 forwardBtn.addEventListener("click", async () => {
 	if (historyIndex >= historyStack.length - 1) {
-	const tab = getActiveTab();
-	if (!tab || tab.historyIndex >= tab.history.length - 1) {
 		return;
 	}
+forwardBtn.addEventListener("click", function () {
+	var tab = getActiveTab();
+	if (!tab || tab.historyIndex >= tab.history.length - 1) return;
+	tab.historyIndex += 1;
+	navigate(tab.history[tab.historyIndex], false, tab.id);
+});
 
 	historyIndex += 1;
 	await navigate(historyStack[historyIndex], false);
-	tab.historyIndex += 1;
-	await navigate(tab.history[tab.historyIndex], false, tab.id);
+reloadBtn.addEventListener("click", function () {
+	var tab = getActiveTab();
+	if (!tab || !tab.url || !frameController) return;
+	frameController.go(tab.url);
 });
 
 reloadBtn.addEventListener("click", () => {
 	if (!frame || !currentUrl) {
-	const tab = getActiveTab();
-	if (!tab || !tab.frame || !tab.url) {
+fullscreenBtn.addEventListener("click", async function () {
+	if (!document.fullscreenElement) {
+		await document.documentElement.requestFullscreen();
 		return;
 	}
+	await document.exitFullscreen();
+});
 
 	frame.go(currentUrl);
-	tab.frame.go(tab.url);
+newTabBtn.addEventListener("click", function () {
+	createTab("");
 });
 
 fullscreenBtn.addEventListener("click", async () => {
 	if (!document.fullscreenElement) {
 		await document.documentElement.requestFullscreen();
-		return;
-	}
-
-	await document.exitFullscreen();
-});
-
-updateNavState();
-newTabBtn.addEventListener("click", () => {
-	createTab();
-});
-
-tabsEl.addEventListener("click", (event) => {
-	if (!(event.target instanceof Element)) {
-		return;
-	}
-
-	const closeBtn = event.target.closest(".tab-close");
+tabsEl.addEventListener("click", function (event) {
+	var target = event.target;
+	if (!target || typeof target.closest !== "function") return;
+	var closeBtn = target.closest(".tab-close");
 	if (closeBtn) {
-		event.stopPropagation();
 		closeTab(closeBtn.dataset.tabId);
 		return;
 	}
 
-	const tabBtn = event.target.closest(".tab-btn");
+	await document.exitFullscreen();
+	var tabBtn = target.closest(".tab-btn");
 	if (tabBtn) {
-		switchToTab(tabBtn.dataset.tabId);
+		switchTab(tabBtn.dataset.tabId);
 	}
 });
 
-try {
-	createTab();
-	updateNavState();
-} catch (err) {
-	showError("Failed to initialize browser UI.", String(err));
-}
+updateNavState();
+createTab("");
