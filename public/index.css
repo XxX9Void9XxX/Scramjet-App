@@ -41,8 +41,8 @@ body {
 
 .browser-topbar {
 	display: flex;
-	align-items: center;
-	gap: 12px;
+	flex-direction: column;
+	gap: 10px;
 	padding: 10px;
 	border: 1px solid var(--border);
 	border-radius: 12px;
@@ -51,6 +51,75 @@ body {
 		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
 		0 0 24px rgba(168, 71, 255, 0.28),
 		0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.tabstrip-wrapper {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.tabstrip {
+	display: flex;
+	align-items: flex-end;
+	gap: 6px;
+	flex: 1;
+	overflow-x: auto;
+	padding-bottom: 2px;
+}
+
+.tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 220px;
+	border: 1px solid var(--border);
+	background: #120b1d;
+	color: var(--muted);
+	height: 34px;
+	padding: 0 10px;
+	border-radius: 12px 12px 8px 8px;
+	cursor: pointer;
+}
+
+.tab.active {
+	background: linear-gradient(180deg, #2a1640 0%, #1b0e2b 100%);
+	color: var(--text);
+	box-shadow: 0 0 18px rgba(168, 71, 255, 0.25);
+}
+
+.tab-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+}
+
+.tab-close {
+	border: none;
+	background: transparent;
+	color: inherit;
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 2px;
+	border-radius: 50%;
+}
+
+.tab-close:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.new-tab-btn {
+	border: 1px solid var(--border);
+	background: var(--panel-elevated);
+	color: var(--text);
+	height: 34px;
+	min-width: 34px;
+	border-radius: 10px;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
 }
 
 .toolbar {
@@ -82,7 +151,8 @@ body {
 }
 
 .toolbar-btn:hover,
-.go-btn:hover {
+.go-btn:hover,
+.new-tab-btn:hover {
 	filter: brightness(1.08);
 	box-shadow: 0 0 20px rgba(174, 95, 255, 0.45);
 }
@@ -114,9 +184,27 @@ body {
 		0 0 20px rgba(168, 71, 255, 0.25);
 }
 
-.landing {
+.view-host {
 	flex: 1;
+	min-height: 0;
+	position: relative;
+}
+
+.landing,
+.tab-frame {
+	position: absolute;
+	inset: 0;
+	display: none;
+	width: 100%;
+	height: 100%;
+}
+
+.landing.active,
+.tab-frame.active {
 	display: flex;
+}
+
+.landing {
 	align-items: center;
 	justify-content: center;
 	padding: 24px;
@@ -149,18 +237,10 @@ body {
 	text-shadow: 0 0 22px rgba(174, 95, 255, 0.4);
 }
 
-.logo-wrapper p {
-	margin: 0;
-	line-height: 1.6;
-	color: var(--muted);
-}
-
-#sj-frame {
+#sj-frame,
+.tab-frame {
 	border: 1px solid var(--border);
 	border-radius: 12px;
-	width: 100%;
-	flex: 1;
-	min-height: 0;
 	background: #fff;
 	box-shadow: 0 0 24px rgba(174, 95, 255, 0.16);
 }
@@ -193,8 +273,8 @@ body {
 	display: none;
 }
 
-.browser-shell.is-browsing:fullscreen #sj-frame,
-.browser-shell.is-browsing:fullscreen .landing {
+.browser-shell.is-browsing:fullscreen .tab-frame.active,
+.browser-shell.is-browsing:fullscreen .landing.active {
 	border: none;
 	border-radius: 0;
 	box-shadow: none;
