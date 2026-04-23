@@ -70,13 +70,16 @@ function showError(message, code) {
 	errorCode.textContent = code || "";
 }
 
+function updateNavState() {
+	backBtn.disabled = historyIndex <= 0;
+	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
 function getScramjet() {
 	if (scramjet) return scramjet;
 	if (typeof $scramjetLoadController !== "function") {
 		throw new Error("Scramjet controller script failed to load.");
 	}
-	var controller = $scramjetLoadController();
-	scramjet = new controller.ScramjetController({
+	var loaded = $scramjetLoadController();
+	scramjet = new loaded.ScramjetController({
 		files: {
 			wasm: "/scram/scramjet.wasm.wasm",
 			all: "/scram/scramjet.all.js",
@@ -87,6 +90,12 @@ function getScramjet() {
 	return scramjet;
 }
 
+async function ensureTransportReady() {
+	let wispUrl =
+		(location.protocol === "https:" ? "wss" : "ws") +
+		"://" +
+		location.host +
+		"/wisp/";
 function getConnection() {
 	if (connection) return connection;
 	if (!window.BareMux || !window.BareMux.BareMuxConnection) {
@@ -96,6 +105,8 @@ function getConnection() {
 	return connection;
 }
 
+	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
+		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 function getActiveTab() {
 	for (var i = 0; i < tabs.length; i += 1) {
 		if (tabs[i].id === activeTabId) return tabs[i];
@@ -103,6 +114,11 @@ function getActiveTab() {
 	return null;
 }
 
+function ensureFrame() {
+	if (!frame) {
+		frame = scramjet.createFrame();
+		frame.frame.id = "sj-frame";
+		landing.replaceWith(frame.frame);
 function labelForUrl(url) {
 	if (!url) return "New Tab";
 	try {
@@ -112,9 +128,9 @@ function labelForUrl(url) {
 	}
 }
 
+async function navigate(inputValue, pushHistory = true) {
+	if (!inputValue.trim()) {
 function updateNavState() {
-	backBtn.disabled = historyIndex <= 0;
-	forwardBtn.disabled = historyIndex >= historyStack.length - 1;
 	var tab = getActiveTab();
 	if (!tab) {
 		backBtn.disabled = true;
@@ -125,12 +141,7 @@ function updateNavState() {
 	forwardBtn.disabled = tab.historyIndex >= tab.history.length - 1;
 }
 
-async function ensureTransportReady() {
-	let wispUrl =
-		(location.protocol === "https:" ? "wss" : "ws") +
-		"://" +
-		location.host +
-		"/wisp/";
+	clearErrors();
 function renderTabs() {
 	tabsEl.innerHTML = "";
 	for (var i = 0; i < tabs.length; i += 1) {
@@ -141,15 +152,13 @@ function renderTabs() {
 		var tabBtn = document.createElement("button");
 		tabBtn.type = "button";
 		tabBtn.className = "tab-btn";
-		tabBtn.dataset.tabId = tab.id;
+		tabBtn.setAttribute("data-tab-id", tab.id);
 		tabBtn.textContent = tab.title;
 
-	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
-		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 		var closeBtn = document.createElement("button");
 		closeBtn.type = "button";
 		closeBtn.className = "tab-close";
-		closeBtn.dataset.tabId = tab.id;
+		closeBtn.setAttribute("data-tab-id", tab.id);
 		closeBtn.innerHTML = "&times;";
 
 		item.appendChild(tabBtn);
@@ -158,12 +167,7 @@ function renderTabs() {
 	}
 }
 
-function ensureFrame() {
-	if (!frame) {
-		frame = scramjet.createFrame();
-		frame.frame.id = "sj-frame";
-		landing.replaceWith(frame.frame);
-function createFrame() {
+function createFrameIfNeeded() {
 	if (frameController) return;
 	frameHost = document.createElement("div");
 	frameHost.id = "sj-frame-host";
@@ -190,16 +194,21 @@ function installNewTabInterceptors() {
 				}
 				return originalOpen(url, target, features);
 			};
-			win.document.addEventListener("click", function (event) {
-				var targetEl = event.target;
-				if (!targetEl || typeof targetEl.closest !== "function") return;
-				var link = targetEl.closest("a[target='_blank']");
-				if (!link || !link.href) return;
-				event.preventDefault();
-				openInNewTab(link.href);
-			}, true);
+
+			win.document.addEventListener(
+				"click",
+				function (event) {
+					var targetEl = event.target;
+					if (!targetEl || typeof targetEl.closest !== "function") return;
+					var link = targetEl.closest("a[target='_blank']");
+					if (!link || !link.href) return;
+					event.preventDefault();
+					openInNewTab(link.href);
+				},
+				true,
+			);
 		} catch (err) {
-			// Ignore cross-origin access restrictions.
+			// ignore cross-origin interception failures
 		}
 	});
 }
@@ -214,39 +223,35 @@ function createTab(initialUrl) {
 	};
 	tabs.push(tab);
 	activeTabId = tab.id;
+	address.value = "";
 	renderTabs();
 	updateNavState();
-	address.value = "";
-	if (initialUrl) {
-		navigate(initialUrl, true, tab.id);
-	}
+	if (initialUrl) navigate(initialUrl, true, tab.id);
 	return tab;
 }
 
-async function navigate(inputValue, pushHistory = true) {
-	if (!inputValue.trim()) {
 function closeTab(tabId) {
-	if (tabs.length === 1) {
+	if (tabs.length <= 1) {
+		tabs[0].title = "New Tab";
+		tabs[0].url = "";
 		tabs[0].history = [];
 		tabs[0].historyIndex = -1;
-		tabs[0].url = "";
-		tabs[0].title = "New Tab";
 		address.value = "";
 		renderTabs();
 		updateNavState();
 		return;
 	}
-	var index = -1;
+	var removeIndex = -1;
 	for (var i = 0; i < tabs.length; i += 1) {
 		if (tabs[i].id === tabId) {
-			index = i;
+			removeIndex = i;
 			break;
 		}
 	}
-	if (index < 0) return;
-	tabs.splice(index, 1);
+	if (removeIndex < 0) return;
+	tabs.splice(removeIndex, 1);
 	if (activeTabId === tabId) {
-		activeTabId = tabs[Math.max(0, index - 1)].id;
+		activeTabId = tabs[Math.max(0, removeIndex - 1)].id;
 	}
 	renderTabs();
 	switchTab(activeTabId);
@@ -260,24 +265,54 @@ function switchTab(tabId) {
 	renderTabs();
 	updateNavState();
 	if (tab.url) {
-		if (!frameController) createFrame();
+		createFrameIfNeeded();
 		frameController.go(tab.url);
 	}
 }
 
-async function ensureTransportReady() {
-	var wispUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
-	var mux = getConnection();
-	if ((await mux.getTransport()) !== "/libcurl/index.mjs") {
-		await mux.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+function ensureTransportReady() {
+	try {
+		await registerSW();
+		await ensureTransportReady();
+		var wispUrl =
+			(location.protocol === "https:" ? "wss" : "ws") +
+			"://" +
+			location.host +
+			"/wisp/";
+		var mux = getConnection();
+		return mux.getTransport().then(function (transport) {
+			if (transport !== "/libcurl/index.mjs") {
+				return mux.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+			}
+		});
+	} catch (err) {
+		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
+		return;
+		return Promise.reject(err);
 	}
 }
 
+	const destination = search(inputValue, searchEngine.value);
+	ensureFrame();
+	currentUrl = destination;
+	address.value = destination;
+	frame.go(destination);
+function registerServiceWorker() {
+	if (typeof registerSW !== "function") {
+		return Promise.reject(new Error("registerSW is unavailable."));
+	}
+	return registerSW();
+}
+
+	if (pushHistory) {
+		historyStack.splice(historyIndex + 1);
+		historyStack.push(destination);
+		historyIndex = historyStack.length - 1;
 function openInNewTab(url) {
 	createTab(url);
 }
 
-async function navigate(inputValue, pushHistory, targetTabId) {
+function navigate(inputValue, pushHistory, targetTabId) {
 	var value = (inputValue || "").trim();
 	if (!value) return;
 	clearErrors();
@@ -291,38 +326,31 @@ async function navigate(inputValue, pushHistory, targetTabId) {
 	}
 	if (!tab) return;
 
-	try {
-		await registerSW();
-		await ensureTransportReady();
-	} catch (err) {
-		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
-		showError("Failed to initialize Scramjet service worker/transport.", String(err));
-		return;
-	}
-
-	const destination = search(inputValue, searchEngine.value);
-	ensureFrame();
-	currentUrl = destination;
-	address.value = destination;
-	frame.go(destination);
-	var destination = search(value, searchEngine.value);
-	tab.url = destination;
-	tab.title = labelForUrl(destination);
-
-	if (pushHistory) {
-		historyStack.splice(historyIndex + 1);
-		historyStack.push(destination);
-		historyIndex = historyStack.length - 1;
-		tab.history.splice(tab.historyIndex + 1);
-		tab.history.push(destination);
-		tab.historyIndex = tab.history.length - 1;
-	}
-
-	if (!frameController) createFrame();
-	frameController.go(destination);
-	address.value = destination;
-	renderTabs();
 	updateNavState();
+	Promise.resolve()
+		.then(registerServiceWorker)
+		.then(ensureTransportReady)
+		.then(function () {
+			var searchFn = typeof search === "function" ? search : function (input) {
+				return input;
+			};
+			var destination = searchFn(value, searchEngine.value);
+			tab.url = destination;
+			tab.title = labelForUrl(destination);
+			if (pushHistory) {
+				tab.history.splice(tab.historyIndex + 1);
+				tab.history.push(destination);
+				tab.historyIndex = tab.history.length - 1;
+			}
+			createFrameIfNeeded();
+			frameController.go(destination);
+			address.value = destination;
+			renderTabs();
+			updateNavState();
+		})
+		.catch(function (err) {
+			showError("Failed to initialize Scramjet service worker/transport.", String(err));
+		});
 }
 
 form.addEventListener("submit", async (event) => {
@@ -369,12 +397,13 @@ reloadBtn.addEventListener("click", function () {
 
 reloadBtn.addEventListener("click", () => {
 	if (!frame || !currentUrl) {
-fullscreenBtn.addEventListener("click", async function () {
-	if (!document.fullscreenElement) {
-		await document.documentElement.requestFullscreen();
 		return;
+fullscreenBtn.addEventListener("click", function () {
+	if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+		document.documentElement.requestFullscreen();
+	} else if (document.exitFullscreen) {
+		document.exitFullscreen();
 	}
-	await document.exitFullscreen();
 });
 
 	frame.go(currentUrl);
@@ -390,16 +419,20 @@ tabsEl.addEventListener("click", function (event) {
 	if (!target || typeof target.closest !== "function") return;
 	var closeBtn = target.closest(".tab-close");
 	if (closeBtn) {
-		closeTab(closeBtn.dataset.tabId);
+		closeTab(closeBtn.getAttribute("data-tab-id"));
 		return;
 	}
 
 	await document.exitFullscreen();
 	var tabBtn = target.closest(".tab-btn");
 	if (tabBtn) {
-		switchTab(tabBtn.dataset.tabId);
+		switchTab(tabBtn.getAttribute("data-tab-id"));
 	}
 });
 
 updateNavState();
-createTab("");
+try {
+	createTab("");
+} catch (err) {
+	showError("Failed to initialize browser UI.", String(err));
+}
