@@ -24,8 +24,6 @@ body {
 	font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	background: radial-gradient(circle at top, #241133 0%, var(--bg) 46%);
 	color: var(--text);
-	background: radial-gradient(circle at top, #241133 0%, var(--bg, #060508) 46%);
-	color: var(--text, #f6eeff);
 }
 
 body {
@@ -47,82 +45,12 @@ body {
 	gap: 12px;
 	padding: 10px;
 	border: 1px solid var(--border);
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
 	border-radius: 12px;
 	background: linear-gradient(180deg, #1f0f2d 0%, var(--panel) 100%);
-	background: linear-gradient(180deg, #1f0f2d 0%, var(--panel, #100816) 100%);
 	box-shadow:
 		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
 		0 0 24px rgba(168, 71, 255, 0.28),
 		0 10px 26px rgba(0, 0, 0, 0.4);
-}
-
-.tabs-row {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 8px 10px;
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
-	border-radius: 12px;
-	background: linear-gradient(180deg, #1f0f2d 0%, var(--panel, #100816) 100%);
-	box-shadow:
-		0 0 0 1px rgba(174, 95, 255, 0.2) inset,
-		0 0 24px rgba(168, 71, 255, 0.2),
-		0 10px 20px rgba(0, 0, 0, 0.35);
-}
-
-.tabs {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex: 1;
-	overflow-x: auto;
-	padding-bottom: 2px;
-}
-
-.tab-item {
-	display: inline-flex;
-	align-items: center;
-	max-width: 240px;
-	height: 34px;
-	padding: 0 4px 0 10px;
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
-	border-radius: 10px;
-	background: rgba(25, 13, 36, 0.75);
-	color: var(--text, #f6eeff);
-}
-
-.tab-item.active {
-	background: linear-gradient(180deg, #a96fff 0%, var(--accent, #7a2ce2) 100%);
-	border-color: transparent;
-}
-
-.tab-btn {
-	border: 0;
-	background: transparent;
-	color: inherit;
-	cursor: pointer;
-	font-size: 13px;
-	padding: 0;
-	flex: 1;
-	height: 100%;
-	text-align: left;
-}
-
-.tab-title {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.tab-close {
-	border: 0;
-	background: transparent;
-	color: inherit;
-	cursor: pointer;
-	font-size: 14px;
-	line-height: 1;
-	padding: 0;
 }
 
 .toolbar {
@@ -137,9 +65,6 @@ body {
 	border: 1px solid var(--border);
 	background: var(--panel-elevated);
 	color: var(--text);
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
-	background: var(--panel-elevated, #190d24);
-	color: var(--text, #f6eeff);
 	height: 36px;
 	min-width: 36px;
 	border-radius: 10px;
@@ -153,14 +78,11 @@ body {
 	font-size: 14px;
 	font-weight: 600;
 	background: linear-gradient(180deg, #bd87ff 0%, var(--accent) 100%);
-	background: linear-gradient(180deg, #bd87ff 0%, var(--accent, #7a2ce2) 100%);
 	border-color: transparent;
 }
 
 .toolbar-btn:hover,
 .go-btn:hover {
-.go-btn:hover,
-.tab-item:hover {
 	filter: brightness(1.08);
 	box-shadow: 0 0 20px rgba(174, 95, 255, 0.45);
 }
@@ -177,11 +99,9 @@ body {
 	height: 38px;
 	padding: 0 14px;
 	border: 1px solid var(--border);
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
 	border-radius: 10px;
 	background: #0d0815;
 	color: var(--text);
-	color: var(--text, #f6eeff);
 	font-size: 15px;
 	outline: none;
 	box-shadow: inset 0 0 0 1px rgba(168, 71, 255, 0.18);
@@ -201,13 +121,11 @@ body {
 	justify-content: center;
 	padding: 24px;
 	border: 1px solid var(--border);
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
 	border-radius: 12px;
 	background:
 		radial-gradient(circle at center, rgba(162, 85, 255, 0.1) 0%, transparent 52%),
 		linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 65%),
 		var(--panel);
-		var(--panel, #100816);
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
 }
 
@@ -232,30 +150,16 @@ body {
 	margin: 0;
 	line-height: 1.6;
 	color: var(--muted);
-	color: var(--muted, rgba(246, 238, 255, 0.75));
-}
-
-#sj-frame-host {
-	display: flex;
-	flex: 1;
-	min-height: 0;
 }
 
 #sj-frame {
 	border: 1px solid var(--border);
-.sj-frame {
-	display: none;
-	border: 1px solid var(--border, rgba(186, 123, 255, 0.34));
 	border-radius: 12px;
 	width: 100%;
 	flex: 1;
 	min-height: 0;
 	background: #fff;
 	box-shadow: 0 0 24px rgba(174, 95, 255, 0.16);
-}
-
-.sj-frame.active {
-	display: block;
 }
 
 .error-area {
@@ -265,7 +169,6 @@ body {
 #sj-error {
 	margin: 0;
 	color: var(--error);
-	color: var(--error, #ff8ea0);
 	white-space: pre-wrap;
 }
 
