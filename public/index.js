@@ -20,6 +20,8 @@ const reloadBtn = document.getElementById("sj-reload");
 const fullscreenBtn = document.getElementById("sj-fullscreen");
 /** @type {HTMLElement} */
 const landing = document.getElementById("landing");
+/** @type {HTMLElement} */
+const browserShell = document.getElementById("browser-shell");
 
 const { ScramjetController } = $scramjetLoadController();
 
@@ -63,6 +65,9 @@ async function ensureTransportReady() {
 
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+		await connection.setTransport("/libcurl/index.mjs", [
+			{ websocket: wispUrl },
+		]);
 	}
 }
 
@@ -86,6 +91,10 @@ async function navigate(inputValue, pushHistory = true) {
 		await ensureTransportReady();
 	} catch (err) {
 		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
+		showError(
+			"Failed to initialize Scramjet service worker/transport.",
+			err.toString()
+		);
 		return;
 	}
 
@@ -111,7 +120,7 @@ form.addEventListener("submit", async (event) => {
 
 backBtn.addEventListener("click", async () => {
 	if (historyIndex <= 0) {
-		return;
+@@ -115,33 +122,34 @@ backBtn.addEventListener("click", async () => {
 	}
 
 	historyIndex -= 1;
@@ -138,6 +147,8 @@ reloadBtn.addEventListener("click", () => {
 fullscreenBtn.addEventListener("click", async () => {
 	if (!document.fullscreenElement) {
 		await document.documentElement.requestFullscreen();
+		const fullscreenTarget = frame?.frame ?? browserShell;
+		await fullscreenTarget.requestFullscreen({ navigationUI: "hide" });
 		return;
 	}
 
