@@ -64,7 +64,6 @@ async function ensureTransportReady() {
 		"/wisp/";
 
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
-		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 		await connection.setTransport("/libcurl/index.mjs", [
 			{ websocket: wispUrl },
 		]);
@@ -76,6 +75,7 @@ function ensureFrame() {
 		frame = scramjet.createFrame();
 		frame.frame.id = "sj-frame";
 		landing.replaceWith(frame.frame);
+		browserShell.classList.add("is-browsing");
 	}
 }
 
@@ -90,7 +90,6 @@ async function navigate(inputValue, pushHistory = true) {
 		await registerSW();
 		await ensureTransportReady();
 	} catch (err) {
-		showError("Failed to initialize Scramjet service worker/transport.", err.toString());
 		showError(
 			"Failed to initialize Scramjet service worker/transport.",
 			err.toString()
@@ -120,7 +119,7 @@ form.addEventListener("submit", async (event) => {
 
 backBtn.addEventListener("click", async () => {
 	if (historyIndex <= 0) {
-@@ -115,33 +122,34 @@ backBtn.addEventListener("click", async () => {
+		return;
 	}
 
 	historyIndex -= 1;
@@ -144,11 +143,21 @@ reloadBtn.addEventListener("click", () => {
 	frame.go(currentUrl);
 });
 
+async function enterFullscreen(element) {
+	if (!element) {
+		return;
+	}
+
+	try {
+		await element.requestFullscreen({ navigationUI: "hide" });
+	} catch (err) {
+		await element.requestFullscreen();
+	}
+}
+
 fullscreenBtn.addEventListener("click", async () => {
 	if (!document.fullscreenElement) {
-		await document.documentElement.requestFullscreen();
-		const fullscreenTarget = frame?.frame ?? browserShell;
-		await fullscreenTarget.requestFullscreen({ navigationUI: "hide" });
+		await enterFullscreen(browserShell);
 		return;
 	}
 
