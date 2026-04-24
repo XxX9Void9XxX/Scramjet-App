@@ -18,6 +18,8 @@ const forwardBtn = document.getElementById("sj-forward");
 const reloadBtn = document.getElementById("sj-reload");
 /** @type {HTMLButtonElement} */
 const fullscreenBtn = document.getElementById("sj-fullscreen");
+/** @type {HTMLButtonElement} */
+const bookmarkletBtn = document.getElementById("sj-bookmarklet");
 /** @type {HTMLElement} */
 const landing = document.getElementById("landing");
 /** @type {HTMLElement} */
@@ -46,6 +48,8 @@ const scramjet = new ScramjetController({
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+const AUTCLICKER_URL =
+	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
 
 /** @type {Array<{id: string,title: string,currentUrl: string,historyStack: string[],historyIndex: number,frame: any,button: HTMLButtonElement,popupBound: boolean}>} */
 const tabs = [];
@@ -190,15 +194,6 @@ function extractFirstIframeSrc(html) {
 	return match ? match[1] : "";
 }
 
-function injectBaseIntoHtml(html, baseUrl) {
-	if (!baseUrl) return html;
-	const baseTag = `<base href="${baseUrl.replace(/"/g, "&quot;")}">`;
-	if (/<head[^>]*>/i.test(html)) {
-		return html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
-	}
-	return `${baseTag}${html}`;
-}
-
 async function ensureTransportReady() {
 	const wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
@@ -228,8 +223,6 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	tab.currentUrl = destination;
 	tab.title = labelFromUrl(destination);
 
-	// If this frame was previously put in srcdoc mode by popup document.write,
-	// clear it before normal Scramjet navigation.
 	if (tab.frame.frame.hasAttribute("srcdoc")) {
 		tab.frame.frame.removeAttribute("srcdoc");
 	}
@@ -292,19 +285,15 @@ function createPopupProxy(tab, baseUrl) {
 			docBuffer += String(chunk);
 		},
 		close() {
-			// Handle pages like hereclicklink.vercel.app:
-			// open about:blank -> document.write(html with iframe src="/home")
 			const iframeSrc = extractFirstIframeSrc(docBuffer);
 			if (iframeSrc) {
 				nav(iframeSrc);
 				return;
 			}
 
-			// Fallback: render written HTML directly in tab iframe.
-			const html = injectBaseIntoHtml(docBuffer || "<!doctype html><title>Tempest</title>", baseUrl);
 			tab.currentUrl = "about:blank";
 			tab.title = "Tempest";
-			tab.frame.frame.srcdoc = html;
+			tab.frame.frame.srcdoc = docBuffer || "<!doctype html><title>Tempest</title>";
 			updateTabButton(tab);
 			updateNavState();
 		},
@@ -339,12 +328,9 @@ function interceptWindowOpenFor(win, baseUrlProvider) {
 				const requested = String(url || "").trim();
 				const childTab = createTab("", true);
 
-				// If caller directly provides URL, navigate immediately.
 				if (requested && requested !== "about:blank") {
 					navigate(resolveUrlWithBase(requested, base), true, childTab);
 				}
-
-				// Return fake popup so code using .document.write or .location still works.
 				return createPopupProxy(childTab, base);
 			}
 			return nativeOpen(url, target, features);
@@ -366,7 +352,6 @@ function interceptWindowOpenFor(win, baseUrlProvider) {
 	}
 }
 
-// Global interception (top window)
 interceptWindowOpenFor(window, () => currentTab()?.currentUrl || location.href);
 
 function bindPopupInterception(tab) {
@@ -443,6 +428,49 @@ function createTab(startUrl = "", activate = true) {
 	return tab;
 }
 
+async function injectAutoclickerIntoCurrentTab() {
+	const tab = currentTab();
+	if (!tab || !tab.currentUrl) {
+		showError("Open a proxied page first, then click AC.");
+		return;
+	}
+
+	let frameWindow;
+	let frameDocument;
+	try {
+		frameWindow = tab.frame.frame.contentWindow;
+		frameDocument = frameWindow?.document;
+	} catch (err) {
+		showError("Cannot access active proxy frame.", String(err));
+		return;
+	}
+
+	if (!frameWindow || !frameDocument) {
+		showError("Proxy frame is not ready yet.");
+		return;
+	}
+
+	try {
+		clearErrors();
+		bookmarkletBtn.disabled = true;
+
+		const response = await fetch(AUTCLICKER_URL, { cache: "no-store" });
+		if (!response.ok) {
+			throw new Error(`Script fetch failed: ${response.status}`);
+		}
+		const scriptText = await response.text();
+
+		const scriptEl = frameDocument.createElement("script");
+		scriptEl.textContent = `${scriptText}\n//# sourceURL=autoclicker.js`;
+		(frameDocument.head || frameDocument.documentElement).appendChild(scriptEl);
+		scriptEl.remove();
+	} catch (err) {
+		showError("Failed to inject bookmarklet.", String(err));
+	} finally {
+		bookmarkletBtn.disabled = false;
+	}
+}
+
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	await navigate(address.value, true);
@@ -457,6 +485,10 @@ homeForm.addEventListener("submit", async (event) => {
 newTabBtn.addEventListener("click", () => {
 	createTab("", true);
 	clearErrors();
+});
+
+bookmarkletBtn.addEventListener("click", () => {
+	injectAutoclickerIntoCurrentTab();
 });
 
 backBtn.addEventListener("click", async () => {
