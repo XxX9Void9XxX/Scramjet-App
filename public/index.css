@@ -220,6 +220,35 @@ body {
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
 }
 
+.home-search {
+	margin-top: 16px;
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+}
+
+.home-search input {
+	width: min(620px, 72vw);
+	height: 40px;
+	padding: 0 14px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: #0d0815;
+	color: var(--text);
+	outline: none;
+}
+
+.home-search button {
+	height: 40px;
+	padding: 0 14px;
+	border-radius: 10px;
+	border: 1px solid transparent;
+	background: linear-gradient(180deg, #bd87ff 0%, var(--accent) 100%);
+	color: #fff;
+	font-weight: 600;
+	cursor: pointer;
+}
+
 .logo-wrapper {
 	text-align: center;
 	max-width: 720px;
