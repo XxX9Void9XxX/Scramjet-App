@@ -58,7 +58,14 @@ fastify.register(fastifyStatic, {
 	decorateReply: false,
 });
 
-fastify.setNotFoundHandler((res, reply) => {
+fastify.setNotFoundHandler((request, reply) => {
+	const pathname = request.raw.url?.split("?")[0] ?? "/";
+	const isStaticAsset = pathname.includes(".");
+
+	if (!isStaticAsset) {
+		return reply.type("text/html").sendFile("index.html");
+	}
+
 	return reply.code(404).type("text/html").sendFile("404.html");
 });
 
