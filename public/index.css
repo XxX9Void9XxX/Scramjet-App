@@ -220,50 +220,52 @@ body {
 	box-shadow: inset 0 0 26px rgba(174, 95, 255, 0.15);
 }
 
+.home-wrapper {
+	text-align: center;
+	width: min(760px, 92vw);
+}
+
+.home-title {
+	margin: 0 0 18px;
+	font-size: clamp(34px, 6vw, 56px);
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	color: #e6ccff;
+	text-shadow:
+		0 0 10px rgba(178, 107, 255, 0.9),
+		0 0 22px rgba(122, 44, 226, 0.9),
+		0 0 40px rgba(122, 44, 226, 0.5);
+}
+
 .home-search {
-	margin-top: 16px;
 	display: flex;
 	gap: 8px;
 	justify-content: center;
 }
 
 .home-search input {
-	width: min(620px, 72vw);
-	height: 40px;
+	width: min(640px, 80vw);
+	height: 38px;
 	padding: 0 14px;
 	border: 1px solid var(--border);
 	border-radius: 10px;
 	background: #0d0815;
 	color: var(--text);
+	font-size: 15px;
 	outline: none;
+	box-shadow: inset 0 0 0 1px rgba(168, 71, 255, 0.18);
 }
 
 .home-search button {
-	height: 40px;
+	height: 38px;
 	padding: 0 14px;
 	border-radius: 10px;
 	border: 1px solid transparent;
 	background: linear-gradient(180deg, #bd87ff 0%, var(--accent) 100%);
 	color: #fff;
+	font-size: 14px;
 	font-weight: 600;
 	cursor: pointer;
-}
-
-.logo-wrapper {
-	text-align: center;
-	max-width: 720px;
-}
-
-.logo {
-	height: 120px;
-	width: auto;
-	filter: drop-shadow(0 0 14px rgba(175, 102, 255, 0.45));
-}
-
-.logo-wrapper h1 {
-	margin: 12px 0 8px;
-	font-size: 34px;
-	text-shadow: 0 0 22px rgba(174, 95, 255, 0.4);
 }
 
 #sj-frame,
@@ -304,6 +306,23 @@ body {
 
 .browser-shell.is-browsing:fullscreen .tab-frame.active,
 .browser-shell.is-browsing:fullscreen .landing.active {
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.browser-shell.startup-direct {
+	padding: 0;
+	gap: 0;
+}
+
+.browser-shell.startup-direct .browser-topbar,
+.browser-shell.startup-direct .error-area {
+	display: none;
+}
+
+.browser-shell.startup-direct .tab-frame.active,
+.browser-shell.startup-direct .landing.active {
 	border: none;
 	border-radius: 0;
 	box-shadow: none;
