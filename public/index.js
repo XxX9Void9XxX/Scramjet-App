@@ -288,6 +288,17 @@ async function getActiveFrameContext() {
 	return { frameWindow, frameDocument, tab };
 }
 
+function teardownErudaInFrame(frameWindow) {
+	try {
+		if (frameWindow.eruda && typeof frameWindow.eruda.destroy === "function") {
+			frameWindow.eruda.destroy();
+		}
+	} catch (_) {}
+	try {
+		delete frameWindow.eruda;
+	} catch (_) {}
+}
+
 async function injectAutoclickerIntoCurrentTab() {
 	try {
 		clearErrors();
@@ -318,9 +329,15 @@ async function injectInspectIntoCurrentTab() {
 		const { frameWindow, frameDocument } = await getActiveFrameContext();
 
 		if (frameWindow.eruda) {
-			frameWindow.eruda.show();
-			showError("Inspector opened.");
-			return;
+			try {
+				if (typeof frameWindow.eruda.show === "function") {
+					frameWindow.eruda.show();
+				}
+				showError("Inspector opened.");
+				return;
+			} catch (_) {
+				teardownErudaInFrame(frameWindow);
+			}
 		}
 
 		const res = await fetch(ERUDA_URL, { cache: "no-store" });
@@ -338,24 +355,6 @@ async function injectInspectIntoCurrentTab() {
 
 		frameWindow.eruda.init({ useShadowDom: true });
 		frameWindow.eruda.show();
-
-		// Prevent copied source from including inspector UI
-		if (!frameDocument.__tempestCopyCleanHook) {
-			frameDocument.addEventListener(
-				"copy",
-				() => {
-					try {
-						if (frameWindow.eruda) {
-							frameWindow.eruda.destroy();
-							showError("Inspector closed for clean copy. Click DEV to reopen.");
-						}
-					} catch {}
-				},
-				true
-			);
-			frameDocument.__tempestCopyCleanHook = true;
-		}
-
 		showError("Inspector opened.");
 	} catch (err) {
 		showError("Failed to open inspector.", String(err));
@@ -364,7 +363,6 @@ async function injectInspectIntoCurrentTab() {
 	}
 }
 
-// Messages from popup shim injected by SW
 window.addEventListener("message", async (event) => {
 	const data = event.data;
 	if (!data || data.__tempestPopup !== true) return;
