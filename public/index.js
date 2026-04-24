@@ -28,6 +28,10 @@ const viewHost = document.getElementById("sj-view-host");
 const tabstrip = document.getElementById("sj-tabstrip");
 /** @type {HTMLButtonElement} */
 const newTabBtn = document.getElementById("sj-new-tab");
+/** @type {HTMLFormElement} */
+const homeForm = document.getElementById("sj-home-form");
+/** @type {HTMLInputElement} */
+const homeSearchInput = document.getElementById("sj-home-search");
 
 const { ScramjetController } = $scramjetLoadController();
 
@@ -61,9 +65,22 @@ function currentTab() {
 	return tabs.find((tab) => tab.id === activeTabId) ?? null;
 }
 
+function parseStartupInput() {
+	const pathname = decodeURIComponent(location.pathname).replace(/^\/+/, "");
+	if (!pathname) {
+		return "";
+	}
+
+	if (/^https?:\/\//i.test(pathname)) {
+		return pathname;
+	}
+
+	return pathname;
+}
+
 function labelFromUrl(url) {
 	if (!url) {
-		return "New Tab";
+		return "Tempest";
 	}
 
 	try {
@@ -113,7 +130,10 @@ function activateTab(tabId) {
 	activeTabId = tabId;
 
 	for (const tab of tabs) {
-		tab.frame.frame.classList.toggle("active", tab.id === activeTabId);
+		tab.frame.frame.classList.toggle(
+			"active",
+			tab.id === activeTabId && Boolean(tab.currentUrl)
+		);
 		updateTabButton(tab);
 	}
 
@@ -228,7 +248,7 @@ function bindPopupInterception(tab) {
 function createTab(startUrl = "", activate = true) {
 	const tab = {
 		id: `tab-${crypto.randomUUID()}`,
-		title: "New Tab",
+		title: "Tempest",
 		currentUrl: "",
 		historyStack: [],
 		historyIndex: -1,
@@ -296,6 +316,9 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	tab.currentUrl = destination;
 	tab.title = labelFromUrl(destination);
 	tab.frame.go(destination);
+	if (tab.id === activeTabId) {
+		activateTab(tab.id);
+	}
 
 	if (pushHistory) {
 		tab.historyStack.splice(tab.historyIndex + 1);
@@ -312,6 +335,12 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	await navigate(address.value, true);
+});
+
+homeForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	address.value = homeSearchInput.value;
+	await navigate(homeSearchInput.value, true);
 });
 
 newTabBtn.addEventListener("click", () => {
@@ -369,6 +398,34 @@ fullscreenBtn.addEventListener("click", async () => {
 	await document.exitFullscreen();
 });
 
+const nativeWindowOpen = window.open.bind(window);
+window.open = (url = "", target = "_blank", features = "") => {
+	if (!target || target === "_blank") {
+		createTab(url || "about:blank", true);
+		return null;
+	}
+	return nativeWindowOpen(url, target, features);
+};
+
+document.addEventListener("click", (event) => {
+	const anchor =
+		event.target instanceof Element
+			? event.target.closest("a[target='_blank']")
+			: null;
+	if (!anchor || !anchor.href) {
+		return;
+	}
+	event.preventDefault();
+	createTab(anchor.href, true);
+});
+
 createTab();
 activateTab(tabs[0].id);
 updateNavState();
+
+const startupInput = parseStartupInput();
+if (startupInput) {
+	homeSearchInput.value = startupInput;
+	address.value = startupInput;
+	navigate(startupInput, true);
+}
