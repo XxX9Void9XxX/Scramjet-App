@@ -30,25 +30,43 @@ const scramjet = new ScramjetController({
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-const AUTOCLICKER_URL = "https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
+const AUTOCLICKER_URL =
+	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
 const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda";
 
 const tabs = [];
 let activeTabId = null;
 
-function clearErrors() { error.textContent = ""; errorCode.textContent = ""; }
-function showError(message, code = "") { error.textContent = message; errorCode.textContent = code; }
-function currentTab() { return tabs.find((t) => t.id === activeTabId) ?? null; }
+function clearErrors() {
+	error.textContent = "";
+	errorCode.textContent = "";
+}
+
+function showError(message, code = "") {
+	error.textContent = message;
+	errorCode.textContent = code;
+}
+
+function currentTab() {
+	return tabs.find((t) => t.id === activeTabId) ?? null;
+}
 
 function parseStartupInput() {
 	const pathname = decodeURIComponent(location.pathname).replace(/^\/+/, "");
 	return pathname || "";
 }
-function shouldShowStartupBar() { return new URLSearchParams(location.search).has("showbar"); }
+
+function shouldShowStartupBar() {
+	return new URLSearchParams(location.search).has("showbar");
+}
 
 function labelFromUrl(url) {
 	if (!url) return "Tempest";
-	try { return new URL(url).hostname || url; } catch { return url; }
+	try {
+		return new URL(url).hostname || url;
+	} catch {
+		return url;
+	}
 }
 
 function updateTabButton(tab) {
@@ -61,7 +79,10 @@ function updateTabButton(tab) {
 function updateNavState() {
 	const tab = currentTab();
 	if (!tab) {
-		backBtn.disabled = true; forwardBtn.disabled = true; reloadBtn.disabled = true; address.value = "";
+		backBtn.disabled = true;
+		forwardBtn.disabled = true;
+		reloadBtn.disabled = true;
+		address.value = "";
 		return;
 	}
 	backBtn.disabled = tab.historyIndex <= 0;
@@ -78,7 +99,10 @@ function setLandingVisible(visible) {
 function activateTab(tabId) {
 	activeTabId = tabId;
 	for (const tab of tabs) {
-		tab.frame.frame.classList.toggle("active", tab.id === activeTabId && Boolean(tab.currentUrl));
+		tab.frame.frame.classList.toggle(
+			"active",
+			tab.id === activeTabId && Boolean(tab.currentUrl)
+		);
 		updateTabButton(tab);
 	}
 	const active = currentTab();
@@ -89,15 +113,22 @@ function activateTab(tabId) {
 function removeTab(tabId) {
 	const index = tabs.findIndex((tab) => tab.id === tabId);
 	if (index === -1) return;
+
 	const [tab] = tabs.splice(index, 1);
 	tab.frame.frame.remove();
 	tab.button.remove();
 
-	if (!tabs.length) return createTab();
+	if (!tabs.length) {
+		createTab();
+		return;
+	}
+
 	if (activeTabId === tabId) {
 		const nextTab = tabs[Math.max(0, index - 1)] ?? tabs[0];
 		activateTab(nextTab.id);
-	} else updateNavState();
+	} else {
+		updateNavState();
+	}
 }
 
 function createTabButton(tab) {
@@ -105,12 +136,21 @@ function createTabButton(tab) {
 	button.type = "button";
 	button.className = "tab";
 	button.setAttribute("role", "tab");
-	button.innerHTML = `<span class="tab-title"></span><span class="tab-close" aria-label="Close tab">✕</span>`;
+	button.innerHTML =
+		`<span class="tab-title"></span>` +
+		`<span class="tab-close" aria-label="Close tab">✕</span>`;
+
 	button.addEventListener("click", (event) => {
-		const closeBtn = event.target instanceof Element ? event.target.closest(".tab-close") : null;
-		if (closeBtn) { event.stopPropagation(); removeTab(tab.id); return; }
+		const closeBtn =
+			event.target instanceof Element ? event.target.closest(".tab-close") : null;
+		if (closeBtn) {
+			event.stopPropagation();
+			removeTab(tab.id);
+			return;
+		}
 		activateTab(tab.id);
 	});
+
 	tabstrip.appendChild(button);
 	return button;
 }
@@ -120,11 +160,16 @@ function resolveUrlWithBase(rawUrl, baseUrl = "") {
 	const t = String(rawUrl).trim();
 	if (!t) return "about:blank";
 	if (t === "about:blank") return t;
-	try { return baseUrl ? new URL(t, baseUrl).href : new URL(t).href; } catch { return t; }
+	try {
+		return baseUrl ? new URL(t, baseUrl).href : new URL(t).href;
+	} catch {
+		return t;
+	}
 }
 
 async function ensureTransportReady() {
-	const wispUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
+	const wispUrl =
+		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 	}
@@ -134,6 +179,7 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	if (!String(inputValue || "").trim()) return;
 	const tab = explicitTab ?? currentTab();
 	if (!tab) return;
+
 	clearErrors();
 
 	try {
@@ -147,7 +193,11 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	const destination = search(String(inputValue), searchEngine.value);
 	tab.currentUrl = destination;
 	tab.title = labelFromUrl(destination);
-	if (tab.frame.frame.hasAttribute("srcdoc")) tab.frame.frame.removeAttribute("srcdoc");
+
+	if (tab.frame.frame.hasAttribute("srcdoc")) {
+		tab.frame.frame.removeAttribute("srcdoc");
+	}
+
 	tab.frame.go(destination);
 
 	if (pushHistory) {
@@ -179,6 +229,7 @@ function createTab(startUrl = "", activate = true) {
 		frame: scramjet.createFrame(),
 		button: null,
 	};
+
 	tab.frame.frame.classList.add("tab-frame");
 	viewHost.appendChild(tab.frame.frame);
 	tab.button = createTabButton(tab);
@@ -187,6 +238,7 @@ function createTab(startUrl = "", activate = true) {
 
 	if (activate) activateTab(tab.id);
 	if (startUrl) navigate(startUrl, true, tab);
+
 	return tab;
 }
 
@@ -199,37 +251,21 @@ async function getActiveFrameContext() {
 	return { frameWindow, frameDocument };
 }
 
-async function injectScriptIntoActiveFrame(url, doneMessage) {
-	try {
-		clearErrors();
-		const { frameWindow, frameDocument } = await getActiveFrameContext();
-		const s = frameDocument.createElement("script");
-		s.src = url;
-		s.onload = () => showError(doneMessage);
-		s.onerror = () => showError(`Failed loading ${url}`);
-		(frameDocument.head || frameDocument.documentElement).appendChild(s);
-
-		// Ensure script executes even in odd DOM states
-		if (!s.parentNode) {
-			frameWindow.eval(`(function(){var x=document.createElement('script');x.src='${url}';document.documentElement.appendChild(x);})();`);
-		}
-	} catch (err) {
-		showError(String(err));
-	}
-}
-
 async function injectAutoclickerIntoCurrentTab() {
 	try {
 		clearErrors();
 		bookmarkletBtn.disabled = true;
+
 		const { frameDocument } = await getActiveFrameContext();
 		const res = await fetch(AUTOCLICKER_URL, { cache: "no-store" });
 		if (!res.ok) throw new Error(`Script fetch failed: ${res.status}`);
 		const code = await res.text();
+
 		const scriptEl = frameDocument.createElement("script");
 		scriptEl.textContent = `${code}\n//# sourceURL=autoclicker.js`;
 		(frameDocument.head || frameDocument.documentElement).appendChild(scriptEl);
 		scriptEl.remove();
+		showError("Autoclicker injected.");
 	} catch (err) {
 		showError("Failed to inject autoclicker.", String(err));
 	} finally {
@@ -238,30 +274,44 @@ async function injectAutoclickerIntoCurrentTab() {
 }
 
 async function injectInspectIntoCurrentTab() {
-	inspectBtn.disabled = true;
-	await injectScriptIntoActiveFrame(ERUDA_URL, "Inspector loaded (DEV).");
 	try {
-		const { frameWindow } = await getActiveFrameContext();
-		frameWindow.eval(`
-			(function(){
-				if (window.eruda) {
-					if (!window.__tempestErudaInit) {
-						eruda.init({ useShadowDom: false });
-						window.__tempestErudaInit = true;
-					} else {
-						eruda.show();
-					}
-				}
-			})();
-		`);
+		clearErrors();
+		inspectBtn.disabled = true;
+
+		const { frameWindow, frameDocument } = await getActiveFrameContext();
+
+		// If already present, just show it.
+		if (frameWindow.eruda) {
+			frameWindow.eruda.show();
+			showError("Inspector opened.");
+			return;
+		}
+
+		// Fetch bundle text and inject inline so CSP/external-script blocking is less likely.
+		const res = await fetch(ERUDA_URL, { cache: "no-store" });
+		if (!res.ok) throw new Error(`Eruda fetch failed: ${res.status}`);
+		const erudaCode = await res.text();
+
+		const scriptEl = frameDocument.createElement("script");
+		scriptEl.textContent = `${erudaCode}\n//# sourceURL=eruda.bundle.js`;
+		(frameDocument.head || frameDocument.documentElement).appendChild(scriptEl);
+		scriptEl.remove();
+
+		if (!frameWindow.eruda) {
+			throw new Error("Eruda loaded but not available in frame.");
+		}
+
+		frameWindow.eruda.init({ useShadowDom: false });
+		frameWindow.eruda.show();
+		showError("Inspector opened.");
 	} catch (err) {
-		showError("Failed to initialize inspector.", String(err));
+		showError("Failed to open inspector.", String(err));
 	} finally {
 		inspectBtn.disabled = false;
 	}
 }
 
-// Messages from SW-injected popup shim inside proxied pages
+// Messages from popup shim injected by SW
 window.addEventListener("message", async (event) => {
 	const data = event.data;
 	if (!data || data.__tempestPopup !== true) return;
@@ -273,6 +323,7 @@ window.addEventListener("message", async (event) => {
 		await openProxyTab(data.url, base);
 		return;
 	}
+
 	if (data.type === "srcdoc" && data.html) {
 		const tab = createTab("", true);
 		tab.currentUrl = "about:blank";
@@ -283,40 +334,78 @@ window.addEventListener("message", async (event) => {
 	}
 });
 
-form.addEventListener("submit", async (event) => { event.preventDefault(); await navigate(address.value, true); });
-homeForm.addEventListener("submit", async (event) => { event.preventDefault(); address.value = homeSearchInput.value; await navigate(homeSearchInput.value, true); });
+form.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	await navigate(address.value, true);
+});
 
-newTabBtn.addEventListener("click", () => { createTab("", true); clearErrors(); });
-bookmarkletBtn.addEventListener("click", () => { injectAutoclickerIntoCurrentTab(); });
-inspectBtn.addEventListener("click", () => { injectInspectIntoCurrentTab(); });
+homeForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	address.value = homeSearchInput.value;
+	await navigate(homeSearchInput.value, true);
+});
+
+newTabBtn.addEventListener("click", () => {
+	createTab("", true);
+	clearErrors();
+});
+
+bookmarkletBtn.addEventListener("click", () => {
+	injectAutoclickerIntoCurrentTab();
+});
+
+inspectBtn.addEventListener("click", () => {
+	injectInspectIntoCurrentTab();
+});
 
 backBtn.addEventListener("click", async () => {
-	const tab = currentTab(); if (!tab || tab.historyIndex <= 0) return;
-	tab.historyIndex -= 1; await navigate(tab.historyStack[tab.historyIndex], false, tab);
+	const tab = currentTab();
+	if (!tab || tab.historyIndex <= 0) return;
+	tab.historyIndex -= 1;
+	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
+
 forwardBtn.addEventListener("click", async () => {
-	const tab = currentTab(); if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
-	tab.historyIndex += 1; await navigate(tab.historyStack[tab.historyIndex], false, tab);
+	const tab = currentTab();
+	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
+	tab.historyIndex += 1;
+	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
-reloadBtn.addEventListener("click", () => { const tab = currentTab(); if (tab?.currentUrl) tab.frame.go(tab.currentUrl); });
+
+reloadBtn.addEventListener("click", () => {
+	const tab = currentTab();
+	if (tab?.currentUrl) tab.frame.go(tab.currentUrl);
+});
 
 async function enterFullscreen(element) {
 	if (!element) return;
-	try { await element.requestFullscreen({ navigationUI: "hide" }); } catch { await element.requestFullscreen(); }
+	try {
+		await element.requestFullscreen({ navigationUI: "hide" });
+	} catch {
+		await element.requestFullscreen();
+	}
 }
+
 fullscreenBtn.addEventListener("click", async () => {
 	if (!document.fullscreenElement) return enterFullscreen(browserShell);
 	await document.exitFullscreen();
 });
 
-document.addEventListener("click", (event) => {
-	const anchor = event.target instanceof Element ? event.target.closest("a[target='_blank']") : null;
-	if (!anchor) return;
-	const href = anchor.getAttribute("href");
-	if (!href) return;
-	event.preventDefault();
-	openProxyTab(href, currentTab()?.currentUrl || location.href);
-}, true);
+document.addEventListener(
+	"click",
+	(event) => {
+		const anchor =
+			event.target instanceof Element
+				? event.target.closest("a[target='_blank']")
+				: null;
+		if (!anchor) return;
+		const href = anchor.getAttribute("href");
+		if (!href) return;
+		event.preventDefault();
+		openProxyTab(href, currentTab()?.currentUrl || location.href);
+	},
+	true
+);
 
 createTab();
 activateTab(tabs[0].id);
