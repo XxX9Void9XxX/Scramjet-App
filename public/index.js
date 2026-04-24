@@ -78,6 +78,11 @@ function parseStartupInput() {
 	return pathname;
 }
 
+function shouldShowStartupBar() {
+	const params = new URLSearchParams(location.search);
+	return params.has("showbar");
+}
+
 function labelFromUrl(url) {
 	if (!url) {
 		return "Tempest";
@@ -437,7 +442,9 @@ updateNavState();
 
 const startupInput = parseStartupInput();
 if (startupInput) {
-	browserShell.classList.add("startup-direct");
+	if (!shouldShowStartupBar()) {
+		browserShell.classList.add("startup-direct");
+	}
 	homeSearchInput.value = startupInput;
 	address.value = startupInput;
 	navigate(startupInput, true);
