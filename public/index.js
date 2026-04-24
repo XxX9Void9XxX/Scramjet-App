@@ -1,42 +1,25 @@
 "use strict";
 
-/** @type {HTMLFormElement} */
 const form = document.getElementById("sj-form");
-/** @type {HTMLInputElement} */
 const address = document.getElementById("sj-address");
-/** @type {HTMLInputElement} */
 const searchEngine = document.getElementById("sj-search-engine");
-/** @type {HTMLParagraphElement} */
 const error = document.getElementById("sj-error");
-/** @type {HTMLPreElement} */
 const errorCode = document.getElementById("sj-error-code");
-/** @type {HTMLButtonElement} */
 const backBtn = document.getElementById("sj-back");
-/** @type {HTMLButtonElement} */
 const forwardBtn = document.getElementById("sj-forward");
-/** @type {HTMLButtonElement} */
 const reloadBtn = document.getElementById("sj-reload");
-/** @type {HTMLButtonElement} */
 const fullscreenBtn = document.getElementById("sj-fullscreen");
-/** @type {HTMLButtonElement} */
 const bookmarkletBtn = document.getElementById("sj-bookmarklet");
-/** @type {HTMLElement} */
+const inspectBtn = document.getElementById("sj-inspect");
 const landing = document.getElementById("landing");
-/** @type {HTMLElement} */
 const browserShell = document.getElementById("browser-shell");
-/** @type {HTMLElement} */
 const viewHost = document.getElementById("sj-view-host");
-/** @type {HTMLElement} */
 const tabstrip = document.getElementById("sj-tabstrip");
-/** @type {HTMLButtonElement} */
 const newTabBtn = document.getElementById("sj-new-tab");
-/** @type {HTMLFormElement} */
 const homeForm = document.getElementById("sj-home-form");
-/** @type {HTMLInputElement} */
 const homeSearchInput = document.getElementById("sj-home-search");
 
 const { ScramjetController } = $scramjetLoadController();
-
 const scramjet = new ScramjetController({
 	files: {
 		wasm: "/scram/scramjet.wasm.wasm",
@@ -44,49 +27,28 @@ const scramjet = new ScramjetController({
 		sync: "/scram/scramjet.sync.js",
 	},
 });
-
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-const AUTOCLICKER_URL =
-	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
+const AUTOCLICKER_URL = "https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
+const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda";
 
-/** @type {Array<{id: string,title: string,currentUrl: string,historyStack: string[],historyIndex: number,frame: any,button: HTMLButtonElement}>} */
 const tabs = [];
 let activeTabId = null;
 
-function clearErrors() {
-	error.textContent = "";
-	errorCode.textContent = "";
-}
-
-function showError(message, code = "") {
-	error.textContent = message;
-	errorCode.textContent = code;
-}
-
-function currentTab() {
-	return tabs.find((tab) => tab.id === activeTabId) ?? null;
-}
+function clearErrors() { error.textContent = ""; errorCode.textContent = ""; }
+function showError(message, code = "") { error.textContent = message; errorCode.textContent = code; }
+function currentTab() { return tabs.find((t) => t.id === activeTabId) ?? null; }
 
 function parseStartupInput() {
 	const pathname = decodeURIComponent(location.pathname).replace(/^\/+/, "");
 	return pathname || "";
 }
-
-function shouldShowStartupBar() {
-	const params = new URLSearchParams(location.search);
-	return params.has("showbar");
-}
+function shouldShowStartupBar() { return new URLSearchParams(location.search).has("showbar"); }
 
 function labelFromUrl(url) {
 	if (!url) return "Tempest";
-	try {
-		const parsed = new URL(url);
-		return parsed.hostname || parsed.href;
-	} catch {
-		return url;
-	}
+	try { return new URL(url).hostname || url; } catch { return url; }
 }
 
 function updateTabButton(tab) {
@@ -99,13 +61,9 @@ function updateTabButton(tab) {
 function updateNavState() {
 	const tab = currentTab();
 	if (!tab) {
-		backBtn.disabled = true;
-		forwardBtn.disabled = true;
-		reloadBtn.disabled = true;
-		address.value = "";
+		backBtn.disabled = true; forwardBtn.disabled = true; reloadBtn.disabled = true; address.value = "";
 		return;
 	}
-
 	backBtn.disabled = tab.historyIndex <= 0;
 	forwardBtn.disabled = tab.historyIndex >= tab.historyStack.length - 1;
 	reloadBtn.disabled = !tab.currentUrl;
@@ -119,15 +77,10 @@ function setLandingVisible(visible) {
 
 function activateTab(tabId) {
 	activeTabId = tabId;
-
 	for (const tab of tabs) {
-		tab.frame.frame.classList.toggle(
-			"active",
-			tab.id === activeTabId && Boolean(tab.currentUrl)
-		);
+		tab.frame.frame.classList.toggle("active", tab.id === activeTabId && Boolean(tab.currentUrl));
 		updateTabButton(tab);
 	}
-
 	const active = currentTab();
 	setLandingVisible(!active || !active.currentUrl);
 	updateNavState();
@@ -136,22 +89,15 @@ function activateTab(tabId) {
 function removeTab(tabId) {
 	const index = tabs.findIndex((tab) => tab.id === tabId);
 	if (index === -1) return;
-
 	const [tab] = tabs.splice(index, 1);
 	tab.frame.frame.remove();
 	tab.button.remove();
 
-	if (tabs.length === 0) {
-		createTab();
-		return;
-	}
-
+	if (!tabs.length) return createTab();
 	if (activeTabId === tabId) {
 		const nextTab = tabs[Math.max(0, index - 1)] ?? tabs[0];
 		activateTab(nextTab.id);
-	} else {
-		updateNavState();
-	}
+	} else updateNavState();
 }
 
 function createTabButton(tab) {
@@ -160,39 +106,25 @@ function createTabButton(tab) {
 	button.className = "tab";
 	button.setAttribute("role", "tab");
 	button.innerHTML = `<span class="tab-title"></span><span class="tab-close" aria-label="Close tab">✕</span>`;
-
 	button.addEventListener("click", (event) => {
-		const closeBtn =
-			event.target instanceof Element ? event.target.closest(".tab-close") : null;
-		if (closeBtn) {
-			event.stopPropagation();
-			removeTab(tab.id);
-			return;
-		}
+		const closeBtn = event.target instanceof Element ? event.target.closest(".tab-close") : null;
+		if (closeBtn) { event.stopPropagation(); removeTab(tab.id); return; }
 		activateTab(tab.id);
 	});
-
 	tabstrip.appendChild(button);
 	return button;
 }
 
 function resolveUrlWithBase(rawUrl, baseUrl = "") {
 	if (!rawUrl) return "about:blank";
-	const trimmed = String(rawUrl).trim();
-	if (!trimmed) return "about:blank";
-	if (trimmed === "about:blank") return trimmed;
-
-	try {
-		return baseUrl ? new URL(trimmed, baseUrl).href : new URL(trimmed).href;
-	} catch {
-		return trimmed;
-	}
+	const t = String(rawUrl).trim();
+	if (!t) return "about:blank";
+	if (t === "about:blank") return t;
+	try { return baseUrl ? new URL(t, baseUrl).href : new URL(t).href; } catch { return t; }
 }
 
 async function ensureTransportReady() {
-	const wispUrl =
-		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
-
+	const wispUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
 	}
@@ -200,10 +132,8 @@ async function ensureTransportReady() {
 
 async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	if (!String(inputValue || "").trim()) return;
-
 	const tab = explicitTab ?? currentTab();
 	if (!tab) return;
-
 	clearErrors();
 
 	try {
@@ -217,11 +147,7 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	const destination = search(String(inputValue), searchEngine.value);
 	tab.currentUrl = destination;
 	tab.title = labelFromUrl(destination);
-
-	if (tab.frame.frame.hasAttribute("srcdoc")) {
-		tab.frame.frame.removeAttribute("srcdoc");
-	}
-
+	if (tab.frame.frame.hasAttribute("srcdoc")) tab.frame.frame.removeAttribute("srcdoc");
 	tab.frame.go(destination);
 
 	if (pushHistory) {
@@ -239,9 +165,7 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 async function openProxyTab(rawUrl, baseUrl = "") {
 	const resolved = resolveUrlWithBase(rawUrl, baseUrl);
 	const tab = createTab("", true);
-	if (resolved && resolved !== "about:blank") {
-		await navigate(resolved, true, tab);
-	}
+	if (resolved && resolved !== "about:blank") await navigate(resolved, true, tab);
 	return tab;
 }
 
@@ -255,7 +179,6 @@ function createTab(startUrl = "", activate = true) {
 		frame: scramjet.createFrame(),
 		button: null,
 	};
-
 	tab.frame.frame.classList.add("tab-frame");
 	viewHost.appendChild(tab.frame.frame);
 	tab.button = createTabButton(tab);
@@ -264,52 +187,81 @@ function createTab(startUrl = "", activate = true) {
 
 	if (activate) activateTab(tab.id);
 	if (startUrl) navigate(startUrl, true, tab);
-
 	return tab;
 }
 
-async function injectAutoclickerIntoCurrentTab() {
+async function getActiveFrameContext() {
 	const tab = currentTab();
-	if (!tab || !tab.currentUrl) {
-		showError("Open a proxied page first, then click AC.");
-		return;
-	}
+	if (!tab || !tab.currentUrl) throw new Error("Open a proxied page first.");
+	const frameWindow = tab.frame.frame.contentWindow;
+	const frameDocument = frameWindow?.document;
+	if (!frameWindow || !frameDocument) throw new Error("Proxy frame not ready.");
+	return { frameWindow, frameDocument };
+}
 
-	let frameWindow;
-	let frameDocument;
+async function injectScriptIntoActiveFrame(url, doneMessage) {
 	try {
-		frameWindow = tab.frame.frame.contentWindow;
-		frameDocument = frameWindow?.document;
+		clearErrors();
+		const { frameWindow, frameDocument } = await getActiveFrameContext();
+		const s = frameDocument.createElement("script");
+		s.src = url;
+		s.onload = () => showError(doneMessage);
+		s.onerror = () => showError(`Failed loading ${url}`);
+		(frameDocument.head || frameDocument.documentElement).appendChild(s);
+
+		// Ensure script executes even in odd DOM states
+		if (!s.parentNode) {
+			frameWindow.eval(`(function(){var x=document.createElement('script');x.src='${url}';document.documentElement.appendChild(x);})();`);
+		}
 	} catch (err) {
-		showError("Cannot access active proxy frame.", String(err));
-		return;
+		showError(String(err));
 	}
+}
 
-	if (!frameWindow || !frameDocument) {
-		showError("Proxy frame is not ready yet.");
-		return;
-	}
-
+async function injectAutoclickerIntoCurrentTab() {
 	try {
 		clearErrors();
 		bookmarkletBtn.disabled = true;
-
-		const response = await fetch(AUTOCLICKER_URL, { cache: "no-store" });
-		if (!response.ok) throw new Error(`Script fetch failed: ${response.status}`);
-		const scriptText = await response.text();
-
+		const { frameDocument } = await getActiveFrameContext();
+		const res = await fetch(AUTOCLICKER_URL, { cache: "no-store" });
+		if (!res.ok) throw new Error(`Script fetch failed: ${res.status}`);
+		const code = await res.text();
 		const scriptEl = frameDocument.createElement("script");
-		scriptEl.textContent = `${scriptText}\n//# sourceURL=autoclicker.js`;
+		scriptEl.textContent = `${code}\n//# sourceURL=autoclicker.js`;
 		(frameDocument.head || frameDocument.documentElement).appendChild(scriptEl);
 		scriptEl.remove();
 	} catch (err) {
-		showError("Failed to inject bookmarklet.", String(err));
+		showError("Failed to inject autoclicker.", String(err));
 	} finally {
 		bookmarkletBtn.disabled = false;
 	}
 }
 
-// Listen for SW-injected popup shim messages from proxied pages.
+async function injectInspectIntoCurrentTab() {
+	inspectBtn.disabled = true;
+	await injectScriptIntoActiveFrame(ERUDA_URL, "Inspector loaded (DEV).");
+	try {
+		const { frameWindow } = await getActiveFrameContext();
+		frameWindow.eval(`
+			(function(){
+				if (window.eruda) {
+					if (!window.__tempestErudaInit) {
+						eruda.init({ useShadowDom: false });
+						window.__tempestErudaInit = true;
+					} else {
+						eruda.show();
+					}
+				}
+			})();
+		`);
+	} catch (err) {
+		showError("Failed to initialize inspector.", String(err));
+	} finally {
+		inspectBtn.disabled = false;
+	}
+}
+
+// Messages from SW-injected popup shim inside proxied pages
 window.addEventListener("message", async (event) => {
 	const data = event.data;
 	if (!data || data.__tempestPopup !== true) return;
@@ -321,7 +273,6 @@ window.addEventListener("message", async (event) => {
 		await openProxyTab(data.url, base);
 		return;
 	}
-
 	if (data.type === "srcdoc" && data.html) {
 		const tab = createTab("", true);
 		tab.currentUrl = "about:blank";
@@ -332,75 +283,40 @@ window.addEventListener("message", async (event) => {
 	}
 });
 
-form.addEventListener("submit", async (event) => {
-	event.preventDefault();
-	await navigate(address.value, true);
-});
+form.addEventListener("submit", async (event) => { event.preventDefault(); await navigate(address.value, true); });
+homeForm.addEventListener("submit", async (event) => { event.preventDefault(); address.value = homeSearchInput.value; await navigate(homeSearchInput.value, true); });
 
-homeForm.addEventListener("submit", async (event) => {
-	event.preventDefault();
-	address.value = homeSearchInput.value;
-	await navigate(homeSearchInput.value, true);
-});
-
-newTabBtn.addEventListener("click", () => {
-	createTab("", true);
-	clearErrors();
-});
-
-bookmarkletBtn.addEventListener("click", () => {
-	injectAutoclickerIntoCurrentTab();
-});
+newTabBtn.addEventListener("click", () => { createTab("", true); clearErrors(); });
+bookmarkletBtn.addEventListener("click", () => { injectAutoclickerIntoCurrentTab(); });
+inspectBtn.addEventListener("click", () => { injectInspectIntoCurrentTab(); });
 
 backBtn.addEventListener("click", async () => {
-	const tab = currentTab();
-	if (!tab || tab.historyIndex <= 0) return;
-	tab.historyIndex -= 1;
-	await navigate(tab.historyStack[tab.historyIndex], false, tab);
+	const tab = currentTab(); if (!tab || tab.historyIndex <= 0) return;
+	tab.historyIndex -= 1; await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
-
 forwardBtn.addEventListener("click", async () => {
-	const tab = currentTab();
-	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
-	tab.historyIndex += 1;
-	await navigate(tab.historyStack[tab.historyIndex], false, tab);
+	const tab = currentTab(); if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
+	tab.historyIndex += 1; await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
-
-reloadBtn.addEventListener("click", () => {
-	const tab = currentTab();
-	if (!tab || !tab.currentUrl) return;
-	tab.frame.go(tab.currentUrl);
-});
+reloadBtn.addEventListener("click", () => { const tab = currentTab(); if (tab?.currentUrl) tab.frame.go(tab.currentUrl); });
 
 async function enterFullscreen(element) {
 	if (!element) return;
-	try {
-		await element.requestFullscreen({ navigationUI: "hide" });
-	} catch {
-		await element.requestFullscreen();
-	}
+	try { await element.requestFullscreen({ navigationUI: "hide" }); } catch { await element.requestFullscreen(); }
 }
-
 fullscreenBtn.addEventListener("click", async () => {
-	if (!document.fullscreenElement) {
-		await enterFullscreen(browserShell);
-		return;
-	}
+	if (!document.fullscreenElement) return enterFullscreen(browserShell);
 	await document.exitFullscreen();
 });
 
 document.addEventListener("click", (event) => {
-	const anchor =
-		event.target instanceof Element ? event.target.closest("a[target='_blank']") : null;
+	const anchor = event.target instanceof Element ? event.target.closest("a[target='_blank']") : null;
 	if (!anchor) return;
-
-	const hrefAttr = anchor.getAttribute("href");
-	if (!hrefAttr) return;
-
+	const href = anchor.getAttribute("href");
+	if (!href) return;
 	event.preventDefault();
-	const base = currentTab()?.currentUrl || location.href;
-	openProxyTab(hrefAttr, base);
-});
+	openProxyTab(href, currentTab()?.currentUrl || location.href);
+}, true);
 
 createTab();
 activateTab(tabs[0].id);
