@@ -39,6 +39,53 @@ const tabs = [];
 let activeTabId = null;
 let urlSyncTimer = 0;
 
+/** Turn scramjet frame URL into the real site URL for the bar (e.g. https://copter.io). */
+function toPrettyUrl(proxyHref) {
+	if (!proxyHref) return "";
+	const s = String(proxyHref);
+	try {
+		const u = new URL(s);
+		if (u.origin !== window.location.origin) return s;
+
+		const prefix = "/scramjet/";
+		if (!u.pathname.startsWith(prefix)) return s;
+
+		const tail = u.pathname.slice(prefix.length);
+		if (!tail) return s;
+
+		let decoded = "";
+		try {
+			decoded = decodeURIComponent(tail);
+		} catch {
+			return s;
+		}
+
+		if (/^https?:\/\//i.test(decoded)) return decoded;
+		if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(decoded)) return `https://${decoded}`;
+		return decoded || s;
+	} catch {
+		return s;
+	}
+}
+
+/** https://example.com/ → https://example.com when it's only root path. */
+function normalizeDisplayUrl(u) {
+	if (!u) return u;
+	try {
+		const x = new URL(u);
+		if (x.pathname === "/" && !x.search && !x.hash) {
+			return `${x.protocol}//${x.host}`;
+		}
+	} catch {
+		// ignore
+	}
+	return u;
+}
+
+function prettyFromAny(href) {
+	return normalizeDisplayUrl(toPrettyUrl(href));
+}
+
 function faviconUrlForPage(url, displayUrl) {
 	const u = String(url || displayUrl || "").trim();
 	if (!u || u === "about:blank") return DEFAULT_FAVICON;
@@ -88,7 +135,7 @@ function updateTabButton(tab) {
 	const favNode = tab.button.querySelector(".tab-favicon");
 	if (titleNode) titleNode.textContent = tab.title;
 	if (favNode) {
-		const src = tab.faviconUrl || faviconUrlForPage(tab.currentUrl, tab.displayUrl);
+		const src = tab.faviconUrl || faviconUrlForPage(tab.displayUrl || tab.currentUrl, tab.displayUrl);
 		if (favNode.getAttribute("src") !== src) favNode.setAttribute("src", src);
 	}
 	tab.button.classList.toggle("active", tab.id === activeTabId);
@@ -204,7 +251,7 @@ function tryFaviconFromFrameDocument(tab, frameDocument) {
 		for (const link of links) {
 			const href = link.getAttribute("href");
 			if (!href) continue;
-			const abs = resolveUrlWithBase(href, tab.currentUrl || undefined);
+			const abs = resolveUrlWithBase(href, tab.displayUrl || tab.currentUrl || undefined);
 			if (abs && abs !== "about:blank") {
 				tab.faviconUrl = abs;
 				return;
@@ -213,44 +260,60 @@ function tryFaviconFromFrameDocument(tab, frameDocument) {
 	} catch {
 		// ignore
 	}
-	tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
+	tab.faviconUrl = faviconUrlForPage(tab.displayUrl || tab.currentUrl, tab.displayUrl);
 }
 
-/**
- * Sync address bar + tab.currentUrl from the proxy iframe when the browser allows reading location.
- */
 function syncTabLocationFromFrame(tab) {
 	const frameEl = tab.frame.frame;
 	if (!frameEl || frameEl.hasAttribute("srcdoc")) return;
 
 	try {
-		const href = frameEl.contentWindow?.location?.href;
-		if (!href) return;
+		const rawHref = frameEl.contentWindow?.location?.href;
+		if (!rawHref) return;
 
-		const prev = tab.currentUrl || "";
-		if (href === prev) return;
+		const pretty = prettyFromAny(rawHref);
+		const prevPretty = tab.displayUrl || tab.currentUrl || "";
 
-		tab.currentUrl = href;
-		tab.displayUrl = href;
-		tab.faviconUrl = faviconUrlForPage(href, href);
-		tryFaviconFromFrameDocument(tab, frameEl.contentWindow.document);
+		if (pretty === prevPretty) return;
 
-		if (tab.id === activeTabId) {
-			address.value = href;
+		tab.currentUrl = pretty;
+		tab.displayUrl = pretty;
+		tab.faviconUrl = faviconUrlForPage(pretty, pretty);
+
+		try {
+			tryFaviconFromFrameDocument(tab, frameEl.contentWindow.document);
+		} catch {
+			// ignore
 		}
 
-		if (tab.historyIndex >= 0 && tab.historyStack[tab.historyIndex] !== href) {
-			tab.historyStack.splice(tab.historyIndex + 1);
-			tab.historyStack.push(href);
-			tab.displayHistoryStack.splice(tab.historyIndex + 1);
-			tab.displayHistoryStack.push(href);
-			tab.historyIndex = tab.historyStack.length - 1;
+		try {
+			const frameDoc = frameEl.contentWindow?.document;
+			if (frameDoc?.title && frameDoc.title.trim()) {
+				tab.title = frameDoc.title.trim();
+			} else {
+				tab.title = labelFromUrl(pretty);
+			}
+		} catch {
+			tab.title = labelFromUrl(pretty);
+		}
+
+		if (tab.id === activeTabId) {
+			address.value = pretty;
+		}
+
+		if (tab.historyIndex >= 0) {
+			tab.historyStack[tab.historyIndex] = pretty;
+			tab.displayHistoryStack[tab.historyIndex] = pretty;
+		} else if (tab.historyStack.length === 0 && pretty) {
+			tab.historyStack.push(pretty);
+			tab.displayHistoryStack.push(pretty);
+			tab.historyIndex = 0;
 		}
 
 		updateTabButton(tab);
 		updateNavState();
 	} catch {
-		// Typical when cross-origin without proxy same-origin access
+		// cross-origin / opaque
 	}
 }
 
@@ -270,6 +333,7 @@ function bindFrameTitleUpdates(tab) {
 	const frameEl = tab.frame.frame;
 	frameEl.addEventListener("load", () => {
 		tab.erudaVisible = false;
+		syncTabLocationFromFrame(tab);
 		try {
 			const frameDoc = frameEl.contentWindow?.document;
 			if (frameDoc?.title && frameDoc.title.trim()) {
@@ -280,10 +344,8 @@ function bindFrameTitleUpdates(tab) {
 			tryFaviconFromFrameDocument(tab, frameDoc);
 		} catch {
 			tab.title = labelFromUrl(tab.displayUrl || tab.currentUrl);
-			tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
+			tab.faviconUrl = faviconUrlForPage(tab.displayUrl || tab.currentUrl, tab.displayUrl);
 		}
-
-		syncTabLocationFromFrame(tab);
 		updateTabButton(tab);
 		if (tab.id === activeTabId) updateNavState();
 	});
@@ -310,10 +372,14 @@ async function navigate(
 	}
 
 	const destination = search(String(inputValue), searchEngine.value);
-	tab.currentUrl = destination;
-	tab.displayUrl = options.displayUrl || destination;
+	const prettyDest = /^https?:\/\//i.test(destination)
+		? normalizeDisplayUrl(destination)
+		: destination;
+
+	tab.currentUrl = prettyDest;
+	tab.displayUrl = options.displayUrl || prettyDest;
 	tab.title = labelFromUrl(tab.displayUrl);
-	tab.faviconUrl = faviconUrlForPage(destination, tab.displayUrl);
+	tab.faviconUrl = faviconUrlForPage(prettyDest, tab.displayUrl);
 	tab.erudaVisible = false;
 	inspectBtn.classList.remove("inspect-active");
 
@@ -325,7 +391,7 @@ async function navigate(
 
 	if (pushHistory) {
 		tab.historyStack.splice(tab.historyIndex + 1);
-		tab.historyStack.push(destination);
+		tab.historyStack.push(tab.displayUrl);
 		tab.displayHistoryStack.splice(tab.historyIndex + 1);
 		tab.displayHistoryStack.push(tab.displayUrl);
 		tab.historyIndex = tab.historyStack.length - 1;
@@ -341,7 +407,8 @@ async function openProxyTab(rawUrl, baseUrl = "", displayUrl = "") {
 	const resolved = resolveUrlWithBase(rawUrl, baseUrl);
 	const tab = createTab("", true);
 	if (resolved && resolved !== "about:blank") {
-		await navigate(resolved, true, tab, { displayUrl: displayUrl || resolved });
+		const disp = displayUrl ? prettyFromAny(displayUrl) : normalizeDisplayUrl(resolved);
+		await navigate(resolved, true, tab, { displayUrl: disp });
 	} else {
 		tab.currentUrl = "about:blank";
 		tab.displayUrl = "about:blank";
@@ -489,7 +556,7 @@ window.addEventListener("message", async (event) => {
 	if (!data || data.__tempestPopup !== true) return;
 
 	const active = currentTab();
-	const base = active?.currentUrl || location.href;
+	const base = active?.displayUrl || active?.currentUrl || location.href;
 
 	if (data.type === "navigate" && data.url) {
 		await openProxyTab(data.url, base, data.displayUrl || "");
@@ -581,7 +648,7 @@ document.addEventListener(
 		const href = anchor.getAttribute("href");
 		if (!href) return;
 		event.preventDefault();
-		openProxyTab(href, currentTab()?.currentUrl || location.href);
+		openProxyTab(href, currentTab()?.displayUrl || currentTab()?.currentUrl || location.href);
 	},
 	true
 );
@@ -595,6 +662,8 @@ const startupInput = parseStartupInput();
 if (startupInput) {
 	if (!shouldShowStartupBar()) browserShell.classList.add("startup-direct");
 	homeSearchInput.value = startupInput;
-	address.value = startupInput;
+	address.value = /^https?:\/\//i.test(startupInput)
+		? normalizeDisplayUrl(startupInput)
+		: startupInput;
 	navigate(startupInput, true);
 }
