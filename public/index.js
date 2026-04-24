@@ -437,6 +437,7 @@ updateNavState();
 
 const startupInput = parseStartupInput();
 if (startupInput) {
+	browserShell.classList.add("startup-direct");
 	homeSearchInput.value = startupInput;
 	address.value = startupInput;
 	navigate(startupInput, true);
