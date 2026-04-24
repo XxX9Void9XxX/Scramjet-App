@@ -67,14 +67,7 @@ function currentTab() {
 
 function parseStartupInput() {
 	const pathname = decodeURIComponent(location.pathname).replace(/^\/+/, "");
-	if (!pathname) {
-		return "";
-	}
-
-	if (/^https?:\/\//i.test(pathname)) {
-		return pathname;
-	}
-
+	if (!pathname) return "";
 	return pathname;
 }
 
@@ -84,23 +77,18 @@ function shouldShowStartupBar() {
 }
 
 function labelFromUrl(url) {
-	if (!url) {
-		return "Tempest";
-	}
-
+	if (!url) return "Tempest";
 	try {
 		const parsed = new URL(url);
 		return parsed.hostname || parsed.href;
-	} catch (err) {
+	} catch {
 		return url;
 	}
 }
 
 function updateTabButton(tab) {
 	const titleNode = tab.button.querySelector(".tab-title");
-	if (titleNode) {
-		titleNode.textContent = tab.title;
-	}
+	if (titleNode) titleNode.textContent = tab.title;
 	if (tab.id === activeTabId) {
 		tab.button.classList.add("active");
 		tab.button.setAttribute("aria-selected", "true");
@@ -149,9 +137,7 @@ function activateTab(tabId) {
 
 function removeTab(tabId) {
 	const index = tabs.findIndex((tab) => tab.id === tabId);
-	if (index === -1) {
-		return;
-	}
+	if (index === -1) return;
 
 	const [tab] = tabs.splice(index, 1);
 	tab.frame.frame.remove();
@@ -195,44 +181,118 @@ function createTabButton(tab) {
 }
 
 function resolveUrlWithBase(rawUrl, baseUrl = "") {
-	if (!rawUrl) {
-		return "about:blank";
-	}
-
+	if (!rawUrl) return "about:blank";
 	const trimmed = String(rawUrl).trim();
-	if (!trimmed) {
-		return "about:blank";
-	}
-
-	if (trimmed === "about:blank") {
-		return trimmed;
-	}
+	if (!trimmed) return "about:blank";
+	if (trimmed === "about:blank") return trimmed;
 
 	try {
-		if (baseUrl) {
-			return new URL(trimmed, baseUrl).href;
-		}
-		return new URL(trimmed).href;
-	} catch (err) {
+		return baseUrl ? new URL(trimmed, baseUrl).href : new URL(trimmed).href;
+	} catch {
 		return trimmed;
 	}
+}
+
+async function ensureTransportReady() {
+	const wispUrl =
+		(location.protocol === "https:" ? "wss" : "ws") +
+		"://" +
+		location.host +
+		"/wisp/";
+
+	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
+		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
+	}
+}
+
+async function navigate(inputValue, pushHistory = true, explicitTab = null) {
+	if (!String(inputValue || "").trim()) return;
+
+	const tab = explicitTab ?? currentTab();
+	if (!tab) return;
+
+	clearErrors();
+
+	try {
+		await registerSW();
+		await ensureTransportReady();
+	} catch (err) {
+		showError(
+			"Failed to initialize Scramjet service worker/transport.",
+			String(err)
+		);
+		return;
+	}
+
+	const destination = search(String(inputValue), searchEngine.value);
+	tab.currentUrl = destination;
+	tab.title = labelFromUrl(destination);
+	tab.frame.go(destination);
+
+	if (pushHistory) {
+		tab.historyStack.splice(tab.historyIndex + 1);
+		tab.historyStack.push(destination);
+		tab.historyIndex = tab.historyStack.length - 1;
+	}
+
+	browserShell.classList.add("is-browsing");
+	updateTabButton(tab);
+	if (tab.id === activeTabId) activateTab(tab.id);
+	updateNavState();
 }
 
 async function openProxyTab(rawUrl, baseUrl = "") {
 	const resolved = resolveUrlWithBase(rawUrl, baseUrl);
 	const tab = createTab("", true);
-
 	if (resolved && resolved !== "about:blank") {
 		await navigate(resolved, true, tab);
 	}
-
 	return tab;
 }
 
+/**
+ * Fake popup object so sites that do:
+ * const w = window.open('about:blank'); w.location = 'https://...';
+ * still navigate into a proxy tab instead of real browser popup.
+ */
+function createPopupProxy(tab, baseUrl) {
+	let closed = false;
+	let pendingBase = baseUrl || "";
+
+	const nav = (next) => {
+		if (closed || !next) return;
+		openProxyTab(next, pendingBase);
+	};
+
+	const locationObj = {};
+	Object.defineProperty(locationObj, "href", {
+		get() {
+			return tab?.currentUrl || "about:blank";
+		},
+		set(v) {
+			nav(String(v || ""));
+		},
+	});
+	locationObj.assign = (v) => nav(String(v || ""));
+	locationObj.replace = (v) => nav(String(v || ""));
+
+	const popup = {
+		closed: false,
+		focus() {},
+		blur() {},
+		close() {
+			closed = true;
+			popup.closed = true;
+		},
+		postMessage() {},
+		opener: window,
+		location: locationObj,
+	};
+	return popup;
+}
+
 function bindPopupInterception(tab) {
-	if (tab.popupBound || !tab.frame?.frame) {
-		return;
-	}
+	if (tab.popupBound || !tab.frame?.frame) return;
 
 	const proxyFrame = tab.frame.frame;
 	proxyFrame.addEventListener("load", () => {
@@ -241,28 +301,31 @@ function bindPopupInterception(tab) {
 		try {
 			frameWindow = proxyFrame.contentWindow;
 			frameDocument = frameWindow?.document;
-		} catch (err) {
+		} catch {
 			return;
 		}
-
-		if (!frameWindow) {
-			return;
-		}
+		if (!frameWindow) return;
 
 		let frameBaseUrl = tab.currentUrl || "";
 		try {
 			frameBaseUrl = frameWindow.location?.href || frameBaseUrl;
-		} catch (err) {
-			// ignore
+		} catch {
+			// ignore cross-origin reads
 		}
 
 		const originalOpen = frameWindow.open?.bind(frameWindow);
 		if (originalOpen && !frameWindow.__tempestOpenWrapped) {
 			frameWindow.open = (url = "", target = "_blank", features = "") => {
-				const targetValue = (target || "_blank").toLowerCase();
-				if (targetValue === "_blank" || targetValue === "_new") {
-					openProxyTab(url || "about:blank", frameBaseUrl);
-					return null;
+				const t = String(target || "_blank").toLowerCase();
+				if (t === "_blank" || t === "_new" || t === "") {
+					const requested = String(url || "").trim();
+					const childTab = createTab("", true);
+
+					if (requested && requested !== "about:blank") {
+						navigate(resolveUrlWithBase(requested, frameBaseUrl), true, childTab);
+					}
+
+					return createPopupProxy(childTab, frameBaseUrl);
 				}
 				return originalOpen(url, target, features);
 			};
@@ -275,60 +338,19 @@ function bindPopupInterception(tab) {
 				(event) => {
 					const anchor =
 						event.target instanceof Element ? event.target.closest("a") : null;
-					if (!anchor || !anchor.href) {
-						return;
-					}
+					if (!anchor) return;
 
-					const targetValue = (
-						anchor.getAttribute("target") || ""
-					).toLowerCase();
-					if (targetValue !== "_blank") {
-						return;
-					}
+					const targetValue = (anchor.getAttribute("target") || "").toLowerCase();
+					if (targetValue !== "_blank") return;
+
+					const hrefAttr = anchor.getAttribute("href");
+					if (!hrefAttr) return;
 
 					event.preventDefault();
-					openProxyTab(anchor.getAttribute("href") || anchor.href, frameBaseUrl);
+					openProxyTab(hrefAttr, frameBaseUrl);
 				},
 				true
 			);
-
-			// Also catch form submissions that open new tab/windows.
-			frameDocument.addEventListener(
-				"submit",
-				(event) => {
-					const formEl =
-						event.target instanceof HTMLFormElement ? event.target : null;
-					if (!formEl) {
-						return;
-					}
-
-					const targetValue = (formEl.getAttribute("target") || "").toLowerCase();
-					if (targetValue !== "_blank" && targetValue !== "_new") {
-						return;
-					}
-
-					event.preventDefault();
-
-					const actionAttr = formEl.getAttribute("action") || frameBaseUrl;
-					const method = (formEl.getAttribute("method") || "GET").toUpperCase();
-
-					if (method !== "GET") {
-						// Keep behavior predictable: non-GET popup forms fall back to same tab.
-						formEl.removeAttribute("target");
-						formEl.submit();
-						return;
-					}
-
-					const actionUrl = resolveUrlWithBase(actionAttr, frameBaseUrl);
-					const formData = new FormData(formEl);
-					const params = new URLSearchParams(formData).toString();
-					const finalUrl = params ? `${actionUrl}${actionUrl.includes("?") ? "&" : "?"}${params}` : actionUrl;
-
-					openProxyTab(finalUrl, frameBaseUrl);
-				},
-				true
-			);
-
 			frameDocument.__tempestBlankIntercepted = true;
 		}
 
@@ -360,72 +382,10 @@ function createTab(startUrl = "", activate = true) {
 	bindPopupInterception(tab);
 	updateTabButton(tab);
 
-	if (activate) {
-		activateTab(tab.id);
-	}
-
-	if (startUrl) {
-		navigate(startUrl, true, tab);
-	}
+	if (activate) activateTab(tab.id);
+	if (startUrl) navigate(startUrl, true, tab);
 
 	return tab;
-}
-
-async function ensureTransportReady() {
-	let wispUrl =
-		(location.protocol === "https:" ? "wss" : "ws") +
-		"://" +
-		location.host +
-		"/wisp/";
-
-	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
-		await connection.setTransport("/libcurl/index.mjs", [
-			{ websocket: wispUrl },
-		]);
-	}
-}
-
-async function navigate(inputValue, pushHistory = true, explicitTab = null) {
-	if (!inputValue.trim()) {
-		return;
-	}
-
-	const tab = explicitTab ?? currentTab();
-	if (!tab) {
-		return;
-	}
-
-	clearErrors();
-
-	try {
-		await registerSW();
-		await ensureTransportReady();
-	} catch (err) {
-		showError(
-			"Failed to initialize Scramjet service worker/transport.",
-			err.toString()
-		);
-		return;
-	}
-
-	const destination = search(inputValue, searchEngine.value);
-	tab.currentUrl = destination;
-	tab.title = labelFromUrl(destination);
-	tab.frame.go(destination);
-	if (tab.id === activeTabId) {
-		activateTab(tab.id);
-	}
-
-	if (pushHistory) {
-		tab.historyStack.splice(tab.historyIndex + 1);
-		tab.historyStack.push(destination);
-		tab.historyIndex = tab.historyStack.length - 1;
-	}
-
-	browserShell.classList.add("is-browsing");
-	setLandingVisible(tab.id !== activeTabId || !tab.currentUrl);
-	updateTabButton(tab);
-	updateNavState();
 }
 
 form.addEventListener("submit", async (event) => {
@@ -446,9 +406,7 @@ newTabBtn.addEventListener("click", () => {
 
 backBtn.addEventListener("click", async () => {
 	const tab = currentTab();
-	if (!tab || tab.historyIndex <= 0) {
-		return;
-	}
+	if (!tab || tab.historyIndex <= 0) return;
 
 	tab.historyIndex -= 1;
 	await navigate(tab.historyStack[tab.historyIndex], false, tab);
@@ -456,9 +414,7 @@ backBtn.addEventListener("click", async () => {
 
 forwardBtn.addEventListener("click", async () => {
 	const tab = currentTab();
-	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) {
-		return;
-	}
+	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
 
 	tab.historyIndex += 1;
 	await navigate(tab.historyStack[tab.historyIndex], false, tab);
@@ -466,21 +422,15 @@ forwardBtn.addEventListener("click", async () => {
 
 reloadBtn.addEventListener("click", () => {
 	const tab = currentTab();
-	if (!tab || !tab.currentUrl) {
-		return;
-	}
-
+	if (!tab || !tab.currentUrl) return;
 	tab.frame.go(tab.currentUrl);
 });
 
 async function enterFullscreen(element) {
-	if (!element) {
-		return;
-	}
-
+	if (!element) return;
 	try {
 		await element.requestFullscreen({ navigationUI: "hide" });
-	} catch (err) {
+	} catch {
 		await element.requestFullscreen();
 	}
 }
@@ -490,17 +440,22 @@ fullscreenBtn.addEventListener("click", async () => {
 		await enterFullscreen(browserShell);
 		return;
 	}
-
 	await document.exitFullscreen();
 });
 
+// Top-level fallback interception
 const nativeWindowOpen = window.open.bind(window);
 window.open = (url = "", target = "_blank", features = "") => {
-	const targetValue = (target || "_blank").toLowerCase();
-	if (targetValue === "_blank" || targetValue === "_new") {
+	const t = String(target || "_blank").toLowerCase();
+	if (t === "_blank" || t === "_new" || t === "") {
 		const base = currentTab()?.currentUrl || location.href;
-		openProxyTab(url || "about:blank", base);
-		return null;
+		const requested = String(url || "").trim();
+
+		const childTab = createTab("", true);
+		if (requested && requested !== "about:blank") {
+			navigate(resolveUrlWithBase(requested, base), true, childTab);
+		}
+		return createPopupProxy(childTab, base);
 	}
 	return nativeWindowOpen(url, target, features);
 };
@@ -510,12 +465,14 @@ document.addEventListener("click", (event) => {
 		event.target instanceof Element
 			? event.target.closest("a[target='_blank']")
 			: null;
-	if (!anchor || !anchor.href) {
-		return;
-	}
+	if (!anchor) return;
+
+	const hrefAttr = anchor.getAttribute("href");
+	if (!hrefAttr) return;
+
 	event.preventDefault();
 	const base = currentTab()?.currentUrl || location.href;
-	openProxyTab(anchor.getAttribute("href") || anchor.href, base);
+	openProxyTab(hrefAttr, base);
 });
 
 createTab();
