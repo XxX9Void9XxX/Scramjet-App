@@ -37,6 +37,7 @@ const DEFAULT_FAVICON = "/tempest.png";
 
 const tabs = [];
 let activeTabId = null;
+let urlSyncTimer = 0;
 
 function faviconUrlForPage(url, displayUrl) {
 	const u = String(url || displayUrl || "").trim();
@@ -126,6 +127,7 @@ function activateTab(tabId) {
 	const active = currentTab();
 	setLandingVisible(!active || !(active.currentUrl || active.frame.frame.srcdoc));
 	updateNavState();
+	startUrlSyncInterval();
 }
 
 function removeTab(tabId) {
@@ -214,6 +216,56 @@ function tryFaviconFromFrameDocument(tab, frameDocument) {
 	tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
 }
 
+/**
+ * Sync address bar + tab.currentUrl from the proxy iframe when the browser allows reading location.
+ */
+function syncTabLocationFromFrame(tab) {
+	const frameEl = tab.frame.frame;
+	if (!frameEl || frameEl.hasAttribute("srcdoc")) return;
+
+	try {
+		const href = frameEl.contentWindow?.location?.href;
+		if (!href) return;
+
+		const prev = tab.currentUrl || "";
+		if (href === prev) return;
+
+		tab.currentUrl = href;
+		tab.displayUrl = href;
+		tab.faviconUrl = faviconUrlForPage(href, href);
+		tryFaviconFromFrameDocument(tab, frameEl.contentWindow.document);
+
+		if (tab.id === activeTabId) {
+			address.value = href;
+		}
+
+		if (tab.historyIndex >= 0 && tab.historyStack[tab.historyIndex] !== href) {
+			tab.historyStack.splice(tab.historyIndex + 1);
+			tab.historyStack.push(href);
+			tab.displayHistoryStack.splice(tab.historyIndex + 1);
+			tab.displayHistoryStack.push(href);
+			tab.historyIndex = tab.historyStack.length - 1;
+		}
+
+		updateTabButton(tab);
+		updateNavState();
+	} catch {
+		// Typical when cross-origin without proxy same-origin access
+	}
+}
+
+function startUrlSyncInterval() {
+	if (urlSyncTimer) {
+		clearInterval(urlSyncTimer);
+		urlSyncTimer = 0;
+	}
+	urlSyncTimer = window.setInterval(() => {
+		const tab = currentTab();
+		if (!tab?.currentUrl || tab.frame.frame.hasAttribute("srcdoc")) return;
+		syncTabLocationFromFrame(tab);
+	}, 400);
+}
+
 function bindFrameTitleUpdates(tab) {
 	const frameEl = tab.frame.frame;
 	frameEl.addEventListener("load", () => {
@@ -230,6 +282,8 @@ function bindFrameTitleUpdates(tab) {
 			tab.title = labelFromUrl(tab.displayUrl || tab.currentUrl);
 			tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
 		}
+
+		syncTabLocationFromFrame(tab);
 		updateTabButton(tab);
 		if (tab.id === activeTabId) updateNavState();
 	});
@@ -261,6 +315,7 @@ async function navigate(
 	tab.title = labelFromUrl(tab.displayUrl);
 	tab.faviconUrl = faviconUrlForPage(destination, tab.displayUrl);
 	tab.erudaVisible = false;
+	inspectBtn.classList.remove("inspect-active");
 
 	if (tab.frame.frame.hasAttribute("srcdoc")) {
 		tab.frame.frame.removeAttribute("srcdoc");
@@ -534,6 +589,7 @@ document.addEventListener(
 createTab();
 activateTab(tabs[0].id);
 updateNavState();
+startUrlSyncInterval();
 
 const startupInput = parseStartupInput();
 if (startupInput) {
