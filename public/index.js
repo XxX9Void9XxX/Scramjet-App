@@ -67,8 +67,7 @@ function currentTab() {
 
 function parseStartupInput() {
 	const pathname = decodeURIComponent(location.pathname).replace(/^\/+/, "");
-	if (!pathname) return "";
-	return pathname;
+	return pathname || "";
 }
 
 function shouldShowStartupBar() {
@@ -89,13 +88,8 @@ function labelFromUrl(url) {
 function updateTabButton(tab) {
 	const titleNode = tab.button.querySelector(".tab-title");
 	if (titleNode) titleNode.textContent = tab.title;
-	if (tab.id === activeTabId) {
-		tab.button.classList.add("active");
-		tab.button.setAttribute("aria-selected", "true");
-	} else {
-		tab.button.classList.remove("active");
-		tab.button.setAttribute("aria-selected", "false");
-	}
+	tab.button.classList.toggle("active", tab.id === activeTabId);
+	tab.button.setAttribute("aria-selected", tab.id === activeTabId ? "true" : "false");
 }
 
 function updateNavState() {
@@ -165,9 +159,7 @@ function createTabButton(tab) {
 
 	button.addEventListener("click", (event) => {
 		const closeBtn =
-			event.target instanceof Element
-				? event.target.closest(".tab-close")
-				: null;
+			event.target instanceof Element ? event.target.closest(".tab-close") : null;
 		if (closeBtn) {
 			event.stopPropagation();
 			removeTab(tab.id);
@@ -195,10 +187,7 @@ function resolveUrlWithBase(rawUrl, baseUrl = "") {
 
 async function ensureTransportReady() {
 	const wispUrl =
-		(location.protocol === "https:" ? "wss" : "ws") +
-		"://" +
-		location.host +
-		"/wisp/";
+		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
 
 	if ((await connection.getTransport()) !== "/libcurl/index.mjs") {
 		await connection.setTransport("/libcurl/index.mjs", [{ websocket: wispUrl }]);
@@ -217,10 +206,7 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 		await registerSW();
 		await ensureTransportReady();
 	} catch (err) {
-		showError(
-			"Failed to initialize Scramjet service worker/transport.",
-			String(err)
-		);
+		showError("Failed to initialize Scramjet service worker/transport.", String(err));
 		return;
 	}
 
@@ -250,18 +236,12 @@ async function openProxyTab(rawUrl, baseUrl = "") {
 	return tab;
 }
 
-/**
- * Fake popup object so sites that do:
- * const w = window.open('about:blank'); w.location = 'https://...';
- * still navigate into a proxy tab instead of real browser popup.
- */
 function createPopupProxy(tab, baseUrl) {
 	let closed = false;
-	let pendingBase = baseUrl || "";
 
 	const nav = (next) => {
 		if (closed || !next) return;
-		openProxyTab(next, pendingBase);
+		openProxyTab(next, baseUrl);
 	};
 
 	const locationObj = {};
@@ -276,19 +256,77 @@ function createPopupProxy(tab, baseUrl) {
 	locationObj.assign = (v) => nav(String(v || ""));
 	locationObj.replace = (v) => nav(String(v || ""));
 
-	const popup = {
+	return {
 		closed: false,
 		focus() {},
 		blur() {},
 		close() {
 			closed = true;
-			popup.closed = true;
+			this.closed = true;
 		},
 		postMessage() {},
 		opener: window,
 		location: locationObj,
 	};
-	return popup;
+}
+
+function interceptWindowOpenFor(win, baseUrlProvider) {
+	try {
+		if (!win || win.__tempestOpenIntercepted) return;
+
+		const nativeOpen = win.open?.bind(win);
+		if (!nativeOpen) return;
+
+		const wrapped = function (url = "", target = "_blank", features = "") {
+			const t = String(target || "_blank").toLowerCase();
+			if (t === "_blank" || t === "_new" || t === "") {
+				const base = baseUrlProvider();
+				const requested = String(url || "").trim();
+				const childTab = createTab("", true);
+
+				if (requested && requested !== "about:blank") {
+					navigate(resolveUrlWithBase(requested, base), true, childTab);
+				}
+				return createPopupProxy(childTab, base);
+			}
+			return nativeOpen(url, target, features);
+		};
+
+		try {
+			Object.defineProperty(win, "open", { value: wrapped, configurable: true, writable: true });
+		} catch {
+			win.open = wrapped;
+		}
+
+		win.__tempestOpenIntercepted = true;
+	} catch {
+		// ignore
+	}
+}
+
+// Global interceptor (covers top + same-origin frames sooner)
+interceptWindowOpenFor(window, () => currentTab()?.currentUrl || location.href);
+try {
+	if (Window?.prototype && !Window.prototype.__tempestPrototypeWrapped) {
+		const protoNativeOpen = Window.prototype.open;
+		Window.prototype.open = function (url = "", target = "_blank", features = "") {
+			const t = String(target || "_blank").toLowerCase();
+			if (t === "_blank" || t === "_new" || t === "") {
+				const base = currentTab()?.currentUrl || location.href;
+				const requested = String(url || "").trim();
+				const childTab = createTab("", true);
+
+				if (requested && requested !== "about:blank") {
+					navigate(resolveUrlWithBase(requested, base), true, childTab);
+				}
+				return createPopupProxy(childTab, base);
+			}
+			return protoNativeOpen.call(this, url, target, features);
+		};
+		Window.prototype.__tempestPrototypeWrapped = true;
+	}
+} catch {
+	// ignore
 }
 
 function bindPopupInterception(tab) {
@@ -306,31 +344,8 @@ function bindPopupInterception(tab) {
 		}
 		if (!frameWindow) return;
 
-		let frameBaseUrl = tab.currentUrl || "";
-		try {
-			frameBaseUrl = frameWindow.location?.href || frameBaseUrl;
-		} catch {
-			// ignore cross-origin reads
-		}
-
-		const originalOpen = frameWindow.open?.bind(frameWindow);
-		if (originalOpen && !frameWindow.__tempestOpenWrapped) {
-			frameWindow.open = (url = "", target = "_blank", features = "") => {
-				const t = String(target || "_blank").toLowerCase();
-				if (t === "_blank" || t === "_new" || t === "") {
-					const requested = String(url || "").trim();
-					const childTab = createTab("", true);
-
-					if (requested && requested !== "about:blank") {
-						navigate(resolveUrlWithBase(requested, frameBaseUrl), true, childTab);
-					}
-
-					return createPopupProxy(childTab, frameBaseUrl);
-				}
-				return originalOpen(url, target, features);
-			};
-			frameWindow.__tempestOpenWrapped = true;
-		}
+		const frameBase = () => tab.currentUrl || location.href;
+		interceptWindowOpenFor(frameWindow, frameBase);
 
 		if (frameDocument && !frameDocument.__tempestBlankIntercepted) {
 			frameDocument.addEventListener(
@@ -347,7 +362,7 @@ function bindPopupInterception(tab) {
 					if (!hrefAttr) return;
 
 					event.preventDefault();
-					openProxyTab(hrefAttr, frameBaseUrl);
+					openProxyTab(hrefAttr, frameBase());
 				},
 				true
 			);
@@ -407,7 +422,6 @@ newTabBtn.addEventListener("click", () => {
 backBtn.addEventListener("click", async () => {
 	const tab = currentTab();
 	if (!tab || tab.historyIndex <= 0) return;
-
 	tab.historyIndex -= 1;
 	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
@@ -415,7 +429,6 @@ backBtn.addEventListener("click", async () => {
 forwardBtn.addEventListener("click", async () => {
 	const tab = currentTab();
 	if (!tab || tab.historyIndex >= tab.historyStack.length - 1) return;
-
 	tab.historyIndex += 1;
 	await navigate(tab.historyStack[tab.historyIndex], false, tab);
 });
@@ -443,28 +456,9 @@ fullscreenBtn.addEventListener("click", async () => {
 	await document.exitFullscreen();
 });
 
-// Top-level fallback interception
-const nativeWindowOpen = window.open.bind(window);
-window.open = (url = "", target = "_blank", features = "") => {
-	const t = String(target || "_blank").toLowerCase();
-	if (t === "_blank" || t === "_new" || t === "") {
-		const base = currentTab()?.currentUrl || location.href;
-		const requested = String(url || "").trim();
-
-		const childTab = createTab("", true);
-		if (requested && requested !== "about:blank") {
-			navigate(resolveUrlWithBase(requested, base), true, childTab);
-		}
-		return createPopupProxy(childTab, base);
-	}
-	return nativeWindowOpen(url, target, features);
-};
-
 document.addEventListener("click", (event) => {
 	const anchor =
-		event.target instanceof Element
-			? event.target.closest("a[target='_blank']")
-			: null;
+		event.target instanceof Element ? event.target.closest("a[target='_blank']") : null;
 	if (!anchor) return;
 
 	const hrefAttr = anchor.getAttribute("href");
@@ -481,9 +475,7 @@ updateNavState();
 
 const startupInput = parseStartupInput();
 if (startupInput) {
-	if (!shouldShowStartupBar()) {
-		browserShell.classList.add("startup-direct");
-	}
+	if (!shouldShowStartupBar()) browserShell.classList.add("startup-direct");
 	homeSearchInput.value = startupInput;
 	address.value = startupInput;
 	navigate(startupInput, true);
