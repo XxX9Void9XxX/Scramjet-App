@@ -6,16 +6,16 @@
 			name="viewport"
 			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
 		/>
-		<title>Tempest Proxy</title>
-		<link rel="shortcut icon" href="tempest.png" />
+		<title>Tempest</title>
+		<link rel="shortcut icon" href="/tempest.png" />
 
 		<script src="/scram/scramjet.all.js"></script>
 		<script src="/baremux/index.js"></script>
 
-		<link rel="stylesheet" href="index.css" />
-		<script src="register-sw.js" defer></script>
-		<script src="search.js" defer></script>
-		<script src="index.js" defer></script>
+		<link rel="stylesheet" href="/index.css" />
+		<script src="/register-sw.js" defer></script>
+		<script src="/search.js" defer></script>
+		<script src="/index.js" defer></script>
 	</head>
 
 	<body>
@@ -82,10 +82,19 @@
 			</header>
 
 			<main id="sj-view-host" class="view-host">
-				<section id="landing" class="landing" aria-hidden="false">
-					<div title="SSP Logo" class="logo-wrapper">
-						<img class="logo" src="tempest.png" alt="Tempest Proxy" />
-						<h1>Tempest Proxy</h1>
+				<section id="landing" class="landing active" aria-hidden="false">
+					<div title="Tempest Logo" class="logo-wrapper">
+						<img class="logo" src="/tempest.png" alt="Tempest" />
+						<h1>Tempest</h1>
+						<form id="sj-home-form" class="home-search" autocomplete="off">
+							<input
+								id="sj-home-search"
+								type="text"
+								placeholder="Search or enter a URL"
+								aria-label="Home search"
+							/>
+							<button type="submit">Search</button>
+						</form>
 					</div>
 				</section>
 			</main>
