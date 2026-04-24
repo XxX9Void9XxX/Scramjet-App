@@ -48,10 +48,10 @@ const scramjet = new ScramjetController({
 scramjet.init();
 
 const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
-const AUTCLICKER_URL =
+const AUTOCLICKER_URL =
 	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
 
-/** @type {Array<{id: string,title: string,currentUrl: string,historyStack: string[],historyIndex: number,frame: any,button: HTMLButtonElement,popupBound: boolean}>} */
+/** @type {Array<{id: string,title: string,currentUrl: string,historyStack: string[],historyIndex: number,frame: any,button: HTMLButtonElement}>} */
 const tabs = [];
 let activeTabId = null;
 
@@ -189,11 +189,6 @@ function resolveUrlWithBase(rawUrl, baseUrl = "") {
 	}
 }
 
-function extractFirstIframeSrc(html) {
-	const match = html.match(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
-	return match ? match[1] : "";
-}
-
 async function ensureTransportReady() {
 	const wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
@@ -250,159 +245,6 @@ async function openProxyTab(rawUrl, baseUrl = "") {
 	return tab;
 }
 
-function createPopupProxy(tab, baseUrl) {
-	let closed = false;
-	let docBuffer = "";
-	let docOpened = false;
-
-	const nav = (next) => {
-		if (closed || !next) return;
-		navigate(resolveUrlWithBase(next, baseUrl), true, tab);
-	};
-
-	const locationObj = {};
-	Object.defineProperty(locationObj, "href", {
-		get() {
-			return tab?.currentUrl || "about:blank";
-		},
-		set(v) {
-			nav(String(v || ""));
-		},
-	});
-	locationObj.assign = (v) => nav(String(v || ""));
-	locationObj.replace = (v) => nav(String(v || ""));
-
-	const documentObj = {
-		open() {
-			docOpened = true;
-			docBuffer = "";
-		},
-		write(chunk = "") {
-			if (!docOpened) {
-				docOpened = true;
-				docBuffer = "";
-			}
-			docBuffer += String(chunk);
-		},
-		close() {
-			const iframeSrc = extractFirstIframeSrc(docBuffer);
-			if (iframeSrc) {
-				nav(iframeSrc);
-				return;
-			}
-
-			tab.currentUrl = "about:blank";
-			tab.title = "Tempest";
-			tab.frame.frame.srcdoc = docBuffer || "<!doctype html><title>Tempest</title>";
-			updateTabButton(tab);
-			updateNavState();
-		},
-	};
-
-	return {
-		closed: false,
-		focus() {},
-		blur() {},
-		close() {
-			closed = true;
-			this.closed = true;
-		},
-		postMessage() {},
-		opener: window,
-		location: locationObj,
-		document: documentObj,
-	};
-}
-
-function interceptWindowOpenFor(win, baseUrlProvider) {
-	try {
-		if (!win || win.__tempestOpenIntercepted) return;
-
-		const nativeOpen = win.open?.bind(win);
-		if (!nativeOpen) return;
-
-		const wrapped = function (url = "", target = "_blank", features = "") {
-			const t = String(target || "_blank").toLowerCase();
-			if (t === "_blank" || t === "_new" || t === "") {
-				const base = baseUrlProvider();
-				const requested = String(url || "").trim();
-				const childTab = createTab("", true);
-
-				if (requested && requested !== "about:blank") {
-					navigate(resolveUrlWithBase(requested, base), true, childTab);
-				}
-				return createPopupProxy(childTab, base);
-			}
-			return nativeOpen(url, target, features);
-		};
-
-		try {
-			Object.defineProperty(win, "open", {
-				value: wrapped,
-				configurable: true,
-				writable: true,
-			});
-		} catch {
-			win.open = wrapped;
-		}
-
-		win.__tempestOpenIntercepted = true;
-	} catch {
-		// ignore
-	}
-}
-
-interceptWindowOpenFor(window, () => currentTab()?.currentUrl || location.href);
-
-function bindPopupInterception(tab) {
-	if (tab.popupBound || !tab.frame?.frame) return;
-
-	const proxyFrame = tab.frame.frame;
-	proxyFrame.addEventListener("load", () => {
-		let frameWindow;
-		let frameDocument;
-		try {
-			frameWindow = proxyFrame.contentWindow;
-			frameDocument = frameWindow?.document;
-		} catch {
-			return;
-		}
-		if (!frameWindow) return;
-
-		const frameBase = () => tab.currentUrl || location.href;
-		interceptWindowOpenFor(frameWindow, frameBase);
-
-		if (frameDocument && !frameDocument.__tempestBlankIntercepted) {
-			frameDocument.addEventListener(
-				"click",
-				(event) => {
-					const anchor =
-						event.target instanceof Element ? event.target.closest("a") : null;
-					if (!anchor) return;
-
-					const targetValue = (anchor.getAttribute("target") || "").toLowerCase();
-					if (targetValue !== "_blank") return;
-
-					const hrefAttr = anchor.getAttribute("href");
-					if (!hrefAttr) return;
-
-					event.preventDefault();
-					openProxyTab(hrefAttr, frameBase());
-				},
-				true
-			);
-			frameDocument.__tempestBlankIntercepted = true;
-		}
-
-		if (frameDocument?.title) {
-			tab.title = frameDocument.title;
-			updateTabButton(tab);
-		}
-	});
-
-	tab.popupBound = true;
-}
-
 function createTab(startUrl = "", activate = true) {
 	const tab = {
 		id: `tab-${crypto.randomUUID()}`,
@@ -412,14 +254,12 @@ function createTab(startUrl = "", activate = true) {
 		historyIndex: -1,
 		frame: scramjet.createFrame(),
 		button: null,
-		popupBound: false,
 	};
 
 	tab.frame.frame.classList.add("tab-frame");
 	viewHost.appendChild(tab.frame.frame);
 	tab.button = createTabButton(tab);
 	tabs.push(tab);
-	bindPopupInterception(tab);
 	updateTabButton(tab);
 
 	if (activate) activateTab(tab.id);
@@ -454,10 +294,8 @@ async function injectAutoclickerIntoCurrentTab() {
 		clearErrors();
 		bookmarkletBtn.disabled = true;
 
-		const response = await fetch(AUTCLICKER_URL, { cache: "no-store" });
-		if (!response.ok) {
-			throw new Error(`Script fetch failed: ${response.status}`);
-		}
+		const response = await fetch(AUTOCLICKER_URL, { cache: "no-store" });
+		if (!response.ok) throw new Error(`Script fetch failed: ${response.status}`);
 		const scriptText = await response.text();
 
 		const scriptEl = frameDocument.createElement("script");
@@ -470,6 +308,29 @@ async function injectAutoclickerIntoCurrentTab() {
 		bookmarkletBtn.disabled = false;
 	}
 }
+
+// Listen for SW-injected popup shim messages from proxied pages.
+window.addEventListener("message", async (event) => {
+	const data = event.data;
+	if (!data || data.__tempestPopup !== true) return;
+
+	const active = currentTab();
+	const base = active?.currentUrl || location.href;
+
+	if (data.type === "navigate" && data.url) {
+		await openProxyTab(data.url, base);
+		return;
+	}
+
+	if (data.type === "srcdoc" && data.html) {
+		const tab = createTab("", true);
+		tab.currentUrl = "about:blank";
+		tab.title = "Tempest";
+		tab.frame.frame.srcdoc = String(data.html);
+		updateTabButton(tab);
+		updateNavState();
+	}
+});
 
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
