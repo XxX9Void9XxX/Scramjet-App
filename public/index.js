@@ -194,6 +194,41 @@ function createTabButton(tab) {
 	return button;
 }
 
+function resolveUrlWithBase(rawUrl, baseUrl = "") {
+	if (!rawUrl) {
+		return "about:blank";
+	}
+
+	const trimmed = String(rawUrl).trim();
+	if (!trimmed) {
+		return "about:blank";
+	}
+
+	if (trimmed === "about:blank") {
+		return trimmed;
+	}
+
+	try {
+		if (baseUrl) {
+			return new URL(trimmed, baseUrl).href;
+		}
+		return new URL(trimmed).href;
+	} catch (err) {
+		return trimmed;
+	}
+}
+
+async function openProxyTab(rawUrl, baseUrl = "") {
+	const resolved = resolveUrlWithBase(rawUrl, baseUrl);
+	const tab = createTab("", true);
+
+	if (resolved && resolved !== "about:blank") {
+		await navigate(resolved, true, tab);
+	}
+
+	return tab;
+}
+
 function bindPopupInterception(tab) {
 	if (tab.popupBound || !tab.frame?.frame) {
 		return;
@@ -214,12 +249,19 @@ function bindPopupInterception(tab) {
 			return;
 		}
 
+		let frameBaseUrl = tab.currentUrl || "";
+		try {
+			frameBaseUrl = frameWindow.location?.href || frameBaseUrl;
+		} catch (err) {
+			// ignore
+		}
+
 		const originalOpen = frameWindow.open?.bind(frameWindow);
 		if (originalOpen && !frameWindow.__tempestOpenWrapped) {
 			frameWindow.open = (url = "", target = "_blank", features = "") => {
 				const targetValue = (target || "_blank").toLowerCase();
 				if (targetValue === "_blank" || targetValue === "_new") {
-					createTab(url || "about:blank", true);
+					openProxyTab(url || "about:blank", frameBaseUrl);
 					return null;
 				}
 				return originalOpen(url, target, features);
@@ -245,10 +287,48 @@ function bindPopupInterception(tab) {
 					}
 
 					event.preventDefault();
-					createTab(anchor.href, true);
+					openProxyTab(anchor.getAttribute("href") || anchor.href, frameBaseUrl);
 				},
 				true
 			);
+
+			// Also catch form submissions that open new tab/windows.
+			frameDocument.addEventListener(
+				"submit",
+				(event) => {
+					const formEl =
+						event.target instanceof HTMLFormElement ? event.target : null;
+					if (!formEl) {
+						return;
+					}
+
+					const targetValue = (formEl.getAttribute("target") || "").toLowerCase();
+					if (targetValue !== "_blank" && targetValue !== "_new") {
+						return;
+					}
+
+					event.preventDefault();
+
+					const actionAttr = formEl.getAttribute("action") || frameBaseUrl;
+					const method = (formEl.getAttribute("method") || "GET").toUpperCase();
+
+					if (method !== "GET") {
+						// Keep behavior predictable: non-GET popup forms fall back to same tab.
+						formEl.removeAttribute("target");
+						formEl.submit();
+						return;
+					}
+
+					const actionUrl = resolveUrlWithBase(actionAttr, frameBaseUrl);
+					const formData = new FormData(formEl);
+					const params = new URLSearchParams(formData).toString();
+					const finalUrl = params ? `${actionUrl}${actionUrl.includes("?") ? "&" : "?"}${params}` : actionUrl;
+
+					openProxyTab(finalUrl, frameBaseUrl);
+				},
+				true
+			);
+
 			frameDocument.__tempestBlankIntercepted = true;
 		}
 
@@ -418,7 +498,8 @@ const nativeWindowOpen = window.open.bind(window);
 window.open = (url = "", target = "_blank", features = "") => {
 	const targetValue = (target || "_blank").toLowerCase();
 	if (targetValue === "_blank" || targetValue === "_new") {
-		createTab(url || "about:blank", true);
+		const base = currentTab()?.currentUrl || location.href;
+		openProxyTab(url || "about:blank", base);
 		return null;
 	}
 	return nativeWindowOpen(url, target, features);
@@ -433,7 +514,8 @@ document.addEventListener("click", (event) => {
 		return;
 	}
 	event.preventDefault();
-	createTab(anchor.href, true);
+	const base = currentTab()?.currentUrl || location.href;
+	openProxyTab(anchor.getAttribute("href") || anchor.href, base);
 });
 
 createTab();
