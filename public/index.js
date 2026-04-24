@@ -33,9 +33,22 @@ const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
 const AUTOCLICKER_URL =
 	"https://cdn.jsdelivr.net/gh/wea-f/Norepted@a4cd53b/bookmarklets/autoclicker.js";
 const ERUDA_URL = "https://cdn.jsdelivr.net/npm/eruda";
+const DEFAULT_FAVICON = "/tempest.png";
 
 const tabs = [];
 let activeTabId = null;
+
+function faviconUrlForPage(url, displayUrl) {
+	const u = String(url || displayUrl || "").trim();
+	if (!u || u === "about:blank") return DEFAULT_FAVICON;
+	try {
+		const parsed = new URL(u);
+		if (!parsed.hostname) return DEFAULT_FAVICON;
+		return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=32`;
+	} catch {
+		return DEFAULT_FAVICON;
+	}
+}
 
 function clearErrors() {
 	error.textContent = "";
@@ -71,7 +84,12 @@ function labelFromUrl(url) {
 
 function updateTabButton(tab) {
 	const titleNode = tab.button.querySelector(".tab-title");
+	const favNode = tab.button.querySelector(".tab-favicon");
 	if (titleNode) titleNode.textContent = tab.title;
+	if (favNode) {
+		const src = tab.faviconUrl || faviconUrlForPage(tab.currentUrl, tab.displayUrl);
+		if (favNode.getAttribute("src") !== src) favNode.setAttribute("src", src);
+	}
 	tab.button.classList.toggle("active", tab.id === activeTabId);
 	tab.button.setAttribute("aria-selected", tab.id === activeTabId ? "true" : "false");
 }
@@ -137,6 +155,7 @@ function createTabButton(tab) {
 	button.className = "tab";
 	button.setAttribute("role", "tab");
 	button.innerHTML =
+		`<img class="tab-favicon" alt="" width="16" height="16" decoding="async" />` +
 		`<span class="tab-title"></span>` +
 		`<span class="tab-close" aria-label="Close tab">✕</span>`;
 
@@ -175,9 +194,30 @@ async function ensureTransportReady() {
 	}
 }
 
+function tryFaviconFromFrameDocument(tab, frameDocument) {
+	try {
+		const links = frameDocument.querySelectorAll(
+			'link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
+		);
+		for (const link of links) {
+			const href = link.getAttribute("href");
+			if (!href) continue;
+			const abs = resolveUrlWithBase(href, tab.currentUrl || undefined);
+			if (abs && abs !== "about:blank") {
+				tab.faviconUrl = abs;
+				return;
+			}
+		}
+	} catch {
+		// ignore
+	}
+	tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
+}
+
 function bindFrameTitleUpdates(tab) {
 	const frameEl = tab.frame.frame;
 	frameEl.addEventListener("load", () => {
+		tab.erudaVisible = false;
 		try {
 			const frameDoc = frameEl.contentWindow?.document;
 			if (frameDoc?.title && frameDoc.title.trim()) {
@@ -185,8 +225,10 @@ function bindFrameTitleUpdates(tab) {
 			} else {
 				tab.title = labelFromUrl(tab.displayUrl || tab.currentUrl);
 			}
+			tryFaviconFromFrameDocument(tab, frameDoc);
 		} catch {
 			tab.title = labelFromUrl(tab.displayUrl || tab.currentUrl);
+			tab.faviconUrl = faviconUrlForPage(tab.currentUrl, tab.displayUrl);
 		}
 		updateTabButton(tab);
 		if (tab.id === activeTabId) updateNavState();
@@ -217,6 +259,8 @@ async function navigate(
 	tab.currentUrl = destination;
 	tab.displayUrl = options.displayUrl || destination;
 	tab.title = labelFromUrl(tab.displayUrl);
+	tab.faviconUrl = faviconUrlForPage(destination, tab.displayUrl);
+	tab.erudaVisible = false;
 
 	if (tab.frame.frame.hasAttribute("srcdoc")) {
 		tab.frame.frame.removeAttribute("srcdoc");
@@ -247,6 +291,8 @@ async function openProxyTab(rawUrl, baseUrl = "", displayUrl = "") {
 		tab.currentUrl = "about:blank";
 		tab.displayUrl = "about:blank";
 		tab.title = "about:blank";
+		tab.faviconUrl = DEFAULT_FAVICON;
+		tab.erudaVisible = false;
 		updateTabButton(tab);
 		updateNavState();
 	}
@@ -259,6 +305,8 @@ function createTab(startUrl = "", activate = true) {
 		title: "Tempest",
 		currentUrl: "",
 		displayUrl: "",
+		faviconUrl: DEFAULT_FAVICON,
+		erudaVisible: false,
 		historyStack: [],
 		displayHistoryStack: [],
 		historyIndex: -1,
@@ -326,17 +374,33 @@ async function injectInspectIntoCurrentTab() {
 		clearErrors();
 		inspectBtn.disabled = true;
 
-		const { frameWindow, frameDocument } = await getActiveFrameContext();
+		const { frameWindow, frameDocument, tab } = await getActiveFrameContext();
 
 		if (frameWindow.eruda) {
+			if (tab.erudaVisible) {
+				try {
+					if (typeof frameWindow.eruda.hide === "function") {
+						frameWindow.eruda.hide();
+					}
+				} catch (_) {}
+				tab.erudaVisible = false;
+				inspectBtn.classList.remove("inspect-active");
+				showError("Inspector hidden.");
+				return;
+			}
 			try {
 				if (typeof frameWindow.eruda.show === "function") {
 					frameWindow.eruda.show();
 				}
-				showError("Inspector opened.");
-				return;
 			} catch (_) {
 				teardownErudaInFrame(frameWindow);
+				tab.erudaVisible = false;
+			}
+			if (frameWindow.eruda) {
+				tab.erudaVisible = true;
+				inspectBtn.classList.add("inspect-active");
+				showError("Inspector shown.");
+				return;
 			}
 		}
 
@@ -355,6 +419,8 @@ async function injectInspectIntoCurrentTab() {
 
 		frameWindow.eruda.init({ useShadowDom: true });
 		frameWindow.eruda.show();
+		tab.erudaVisible = true;
+		inspectBtn.classList.add("inspect-active");
 		showError("Inspector opened.");
 	} catch (err) {
 		showError("Failed to open inspector.", String(err));
@@ -380,6 +446,8 @@ window.addEventListener("message", async (event) => {
 		tab.currentUrl = "about:blank";
 		tab.displayUrl = data.displayUrl || "about:blank";
 		tab.title = "about:blank";
+		tab.faviconUrl = DEFAULT_FAVICON;
+		tab.erudaVisible = false;
 		tab.frame.frame.srcdoc = String(data.html);
 		updateTabButton(tab);
 		updateNavState();
