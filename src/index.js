@@ -60,9 +60,12 @@ fastify.register(fastifyStatic, {
 
 fastify.setNotFoundHandler((request, reply) => {
 	const pathname = request.raw.url?.split("?")[0] ?? "/";
-	const isStaticAsset = pathname.includes(".");
+	const decodedPath = decodeURIComponent(pathname);
+	const isStartupProxyPath = /^\/https?:\/\//i.test(decodedPath);
+	const lastPathSegment = pathname.split("/").pop() ?? "";
+	const hasFileExtension = /\.[a-z0-9]{2,8}$/i.test(lastPathSegment);
 
-	if (!isStaticAsset) {
+	if (isStartupProxyPath || !hasFileExtension) {
 		return reply.type("text/html").sendFile("index.html");
 	}
 
