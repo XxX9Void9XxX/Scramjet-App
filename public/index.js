@@ -185,6 +185,20 @@ function resolveUrlWithBase(rawUrl, baseUrl = "") {
 	}
 }
 
+function extractFirstIframeSrc(html) {
+	const match = html.match(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
+	return match ? match[1] : "";
+}
+
+function injectBaseIntoHtml(html, baseUrl) {
+	if (!baseUrl) return html;
+	const baseTag = `<base href="${baseUrl.replace(/"/g, "&quot;")}">`;
+	if (/<head[^>]*>/i.test(html)) {
+		return html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
+	}
+	return `${baseTag}${html}`;
+}
+
 async function ensureTransportReady() {
 	const wispUrl =
 		(location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
@@ -213,6 +227,13 @@ async function navigate(inputValue, pushHistory = true, explicitTab = null) {
 	const destination = search(String(inputValue), searchEngine.value);
 	tab.currentUrl = destination;
 	tab.title = labelFromUrl(destination);
+
+	// If this frame was previously put in srcdoc mode by popup document.write,
+	// clear it before normal Scramjet navigation.
+	if (tab.frame.frame.hasAttribute("srcdoc")) {
+		tab.frame.frame.removeAttribute("srcdoc");
+	}
+
 	tab.frame.go(destination);
 
 	if (pushHistory) {
@@ -238,10 +259,12 @@ async function openProxyTab(rawUrl, baseUrl = "") {
 
 function createPopupProxy(tab, baseUrl) {
 	let closed = false;
+	let docBuffer = "";
+	let docOpened = false;
 
 	const nav = (next) => {
 		if (closed || !next) return;
-		openProxyTab(next, baseUrl);
+		navigate(resolveUrlWithBase(next, baseUrl), true, tab);
 	};
 
 	const locationObj = {};
@@ -256,6 +279,37 @@ function createPopupProxy(tab, baseUrl) {
 	locationObj.assign = (v) => nav(String(v || ""));
 	locationObj.replace = (v) => nav(String(v || ""));
 
+	const documentObj = {
+		open() {
+			docOpened = true;
+			docBuffer = "";
+		},
+		write(chunk = "") {
+			if (!docOpened) {
+				docOpened = true;
+				docBuffer = "";
+			}
+			docBuffer += String(chunk);
+		},
+		close() {
+			// Handle pages like hereclicklink.vercel.app:
+			// open about:blank -> document.write(html with iframe src="/home")
+			const iframeSrc = extractFirstIframeSrc(docBuffer);
+			if (iframeSrc) {
+				nav(iframeSrc);
+				return;
+			}
+
+			// Fallback: render written HTML directly in tab iframe.
+			const html = injectBaseIntoHtml(docBuffer || "<!doctype html><title>Tempest</title>", baseUrl);
+			tab.currentUrl = "about:blank";
+			tab.title = "Tempest";
+			tab.frame.frame.srcdoc = html;
+			updateTabButton(tab);
+			updateNavState();
+		},
+	};
+
 	return {
 		closed: false,
 		focus() {},
@@ -267,6 +321,7 @@ function createPopupProxy(tab, baseUrl) {
 		postMessage() {},
 		opener: window,
 		location: locationObj,
+		document: documentObj,
 	};
 }
 
@@ -284,16 +339,23 @@ function interceptWindowOpenFor(win, baseUrlProvider) {
 				const requested = String(url || "").trim();
 				const childTab = createTab("", true);
 
+				// If caller directly provides URL, navigate immediately.
 				if (requested && requested !== "about:blank") {
 					navigate(resolveUrlWithBase(requested, base), true, childTab);
 				}
+
+				// Return fake popup so code using .document.write or .location still works.
 				return createPopupProxy(childTab, base);
 			}
 			return nativeOpen(url, target, features);
 		};
 
 		try {
-			Object.defineProperty(win, "open", { value: wrapped, configurable: true, writable: true });
+			Object.defineProperty(win, "open", {
+				value: wrapped,
+				configurable: true,
+				writable: true,
+			});
 		} catch {
 			win.open = wrapped;
 		}
@@ -304,30 +366,8 @@ function interceptWindowOpenFor(win, baseUrlProvider) {
 	}
 }
 
-// Global interceptor (covers top + same-origin frames sooner)
+// Global interception (top window)
 interceptWindowOpenFor(window, () => currentTab()?.currentUrl || location.href);
-try {
-	if (Window?.prototype && !Window.prototype.__tempestPrototypeWrapped) {
-		const protoNativeOpen = Window.prototype.open;
-		Window.prototype.open = function (url = "", target = "_blank", features = "") {
-			const t = String(target || "_blank").toLowerCase();
-			if (t === "_blank" || t === "_new" || t === "") {
-				const base = currentTab()?.currentUrl || location.href;
-				const requested = String(url || "").trim();
-				const childTab = createTab("", true);
-
-				if (requested && requested !== "about:blank") {
-					navigate(resolveUrlWithBase(requested, base), true, childTab);
-				}
-				return createPopupProxy(childTab, base);
-			}
-			return protoNativeOpen.call(this, url, target, features);
-		};
-		Window.prototype.__tempestPrototypeWrapped = true;
-	}
-} catch {
-	// ignore
-}
 
 function bindPopupInterception(tab) {
 	if (tab.popupBound || !tab.frame?.frame) return;
