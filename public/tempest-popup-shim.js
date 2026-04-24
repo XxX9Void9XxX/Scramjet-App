@@ -2,10 +2,22 @@
 	if (window.__tempestPopupShimInstalled) return;
 	window.__tempestPopupShimInstalled = true;
 
+	/**
+	 * When Tempest is embedded (e.g. site → iframe → Tempest → proxy frame → this page),
+	 * `top` is the embedding site, not Tempest. Notify every ancestor up the chain
+	 * so the Tempest shell (whichever level that is) receives the message.
+	 */
 	function send(payload) {
-		try {
-			top.postMessage({ __tempestPopup: true, ...payload }, "*");
-		} catch (_) {}
+		const msg = { __tempestPopup: true, ...payload };
+		let target = window;
+		for (;;) {
+			const parentWin = target.parent;
+			if (parentWin === target) break;
+			try {
+				parentWin.postMessage(msg, "*");
+			} catch (_) {}
+			target = parentWin;
+		}
 	}
 
 	function abs(raw, base) {
@@ -25,25 +37,28 @@
 		let closed = false;
 		let opened = false;
 		let buf = "";
-		const openedAsBlank = String(openedUrl || "").trim().toLowerCase() === "about:blank";
+		const openedAsBlank =
+			String(openedUrl || "").trim().toLowerCase() === "about:blank";
 
 		const nav = (u) => {
 			if (closed || !u) return;
 			send({
 				type: "navigate",
 				url: abs(u, baseUrl),
-				displayUrl: openedAsBlank ? "about:blank" : undefined
+				displayUrl: openedAsBlank ? "about:blank" : undefined,
 			});
 		};
 
 		const loc = {};
 		Object.defineProperty(loc, "href", {
 			get() {
-				return openedAsBlank ? "about:blank" : abs(openedUrl || "about:blank", baseUrl);
+				return openedAsBlank
+					? "about:blank"
+					: abs(openedUrl || "about:blank", baseUrl);
 			},
 			set(v) {
 				nav(v);
-			}
+			},
 		});
 		loc.assign = (v) => nav(v);
 		loc.replace = (v) => nav(v);
@@ -66,16 +81,16 @@
 					send({
 						type: "navigate",
 						url: abs(src, baseUrl),
-						displayUrl: openedAsBlank ? "about:blank" : undefined
+						displayUrl: openedAsBlank ? "about:blank" : undefined,
 					});
 					return;
 				}
 				send({
 					type: "srcdoc",
 					html: buf || "<!doctype html><title>Tempest</title>",
-					displayUrl: openedAsBlank ? "about:blank" : undefined
+					displayUrl: openedAsBlank ? "about:blank" : undefined,
 				});
-			}
+			},
 		};
 
 		return {
@@ -89,7 +104,7 @@
 			postMessage() {},
 			opener: window,
 			location: loc,
-			document: doc
+			document: doc,
 		};
 	}
 
