@@ -212,7 +212,8 @@ function bindPopupInterception(tab) {
 		const originalOpen = frameWindow.open?.bind(frameWindow);
 		if (originalOpen && !frameWindow.__tempestOpenWrapped) {
 			frameWindow.open = (url = "", target = "_blank", features = "") => {
-				if (!target || target === "_blank") {
+				const targetValue = (target || "_blank").toLowerCase();
+				if (targetValue === "_blank" || targetValue === "_new") {
 					createTab(url || "about:blank", true);
 					return null;
 				}
@@ -222,17 +223,27 @@ function bindPopupInterception(tab) {
 		}
 
 		if (frameDocument && !frameDocument.__tempestBlankIntercepted) {
-			frameDocument.addEventListener("click", (event) => {
-				const anchor =
-					event.target instanceof Element
-						? event.target.closest("a[target='_blank']")
-						: null;
-				if (!anchor || !anchor.href) {
-					return;
-				}
-				event.preventDefault();
-				createTab(anchor.href, true);
-			});
+			frameDocument.addEventListener(
+				"click",
+				(event) => {
+					const anchor =
+						event.target instanceof Element ? event.target.closest("a") : null;
+					if (!anchor || !anchor.href) {
+						return;
+					}
+
+					const targetValue = (
+						anchor.getAttribute("target") || ""
+					).toLowerCase();
+					if (targetValue !== "_blank") {
+						return;
+					}
+
+					event.preventDefault();
+					createTab(anchor.href, true);
+				},
+				true
+			);
 			frameDocument.__tempestBlankIntercepted = true;
 		}
 
@@ -400,7 +411,8 @@ fullscreenBtn.addEventListener("click", async () => {
 
 const nativeWindowOpen = window.open.bind(window);
 window.open = (url = "", target = "_blank", features = "") => {
-	if (!target || target === "_blank") {
+	const targetValue = (target || "_blank").toLowerCase();
+	if (targetValue === "_blank" || targetValue === "_new") {
 		createTab(url || "about:blank", true);
 		return null;
 	}
