@@ -21,43 +21,69 @@
 		return m ? m[1] : "";
 	}
 
-	function fakePopup(baseUrl) {
+	function fakePopup(baseUrl, openedUrl) {
 		let closed = false;
 		let opened = false;
 		let buf = "";
+		const openedAsBlank = String(openedUrl || "").trim().toLowerCase() === "about:blank";
 
 		const nav = (u) => {
 			if (closed || !u) return;
-			send({ type: "navigate", url: abs(u, baseUrl) });
+			send({
+				type: "navigate",
+				url: abs(u, baseUrl),
+				displayUrl: openedAsBlank ? "about:blank" : undefined
+			});
 		};
 
 		const loc = {};
 		Object.defineProperty(loc, "href", {
-			get() { return "about:blank"; },
-			set(v) { nav(v); }
+			get() {
+				return openedAsBlank ? "about:blank" : abs(openedUrl || "about:blank", baseUrl);
+			},
+			set(v) {
+				nav(v);
+			}
 		});
 		loc.assign = (v) => nav(v);
 		loc.replace = (v) => nav(v);
 
 		const doc = {
-			open() { opened = true; buf = ""; },
+			open() {
+				opened = true;
+				buf = "";
+			},
 			write(chunk) {
-				if (!opened) { opened = true; buf = ""; }
+				if (!opened) {
+					opened = true;
+					buf = "";
+				}
 				buf += String(chunk || "");
 			},
 			close() {
 				const src = firstIframeSrc(buf);
 				if (src) {
-					nav(src);
+					send({
+						type: "navigate",
+						url: abs(src, baseUrl),
+						displayUrl: openedAsBlank ? "about:blank" : undefined
+					});
 					return;
 				}
-				send({ type: "srcdoc", html: buf || "<!doctype html><title>Tempest</title>" });
+				send({
+					type: "srcdoc",
+					html: buf || "<!doctype html><title>Tempest</title>",
+					displayUrl: openedAsBlank ? "about:blank" : undefined
+				});
 			}
 		};
 
 		return {
 			closed: false,
-			close() { closed = true; this.closed = true; },
+			close() {
+				closed = true;
+				this.closed = true;
+			},
 			focus() {},
 			blur() {},
 			postMessage() {},
@@ -76,18 +102,25 @@
 				if (req && req !== "about:blank") {
 					send({ type: "navigate", url: abs(req, location.href) });
 				}
-				return fakePopup(location.href);
+				return fakePopup(location.href, req || "about:blank");
 			}
 			return nativeOpen(url, target, features);
 		};
 	}
 
-	document.addEventListener("click", (event) => {
-		const a = event.target instanceof Element ? event.target.closest("a[target='_blank']") : null;
-		if (!a) return;
-		const href = a.getAttribute("href");
-		if (!href) return;
-		event.preventDefault();
-		send({ type: "navigate", url: abs(href, location.href) });
-	}, true);
+	document.addEventListener(
+		"click",
+		(event) => {
+			const a =
+				event.target instanceof Element
+					? event.target.closest("a[target='_blank']")
+					: null;
+			if (!a) return;
+			const href = a.getAttribute("href");
+			if (!href) return;
+			event.preventDefault();
+			send({ type: "navigate", url: abs(href, location.href) });
+		},
+		true
+	);
 })();
