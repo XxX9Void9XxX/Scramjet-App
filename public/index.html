@@ -22,69 +22,21 @@
 		<div id="browser-shell" class="browser-shell">
 			<header class="browser-topbar">
 				<div class="tabstrip-wrapper">
-					<div
-						id="sj-tabstrip"
-						class="tabstrip"
-						role="tablist"
-						aria-label="Tabs"
-					></div>
-					<button
-						id="sj-new-tab"
-						class="new-tab-btn"
-						type="button"
-						title="New tab"
-					>
-						+
-					</button>
+					<div id="sj-tabstrip" class="tabstrip" role="tablist" aria-label="Tabs"></div>
+					<button id="sj-new-tab" class="new-tab-btn" type="button" title="New tab">+</button>
 				</div>
 
 				<form id="sj-form" class="toolbar" autocomplete="off">
-					<input
-						id="sj-search-engine"
-						value="https://duckduckgo.com/%s"
-						type="hidden"
-					/>
-					<button id="sj-back" class="toolbar-btn" type="button" title="Back">
-						&#8592;
-					</button>
-					<button
-						id="sj-forward"
-						class="toolbar-btn"
-						type="button"
-						title="Forward"
-					>
-						&#8594;
-					</button>
-					<button
-						id="sj-reload"
-						class="toolbar-btn"
-						type="button"
-						title="Reload"
-					>
-						&#10227;
-					</button>
-					<button
-						id="sj-bookmarklet"
-						class="toolbar-btn bookmarklet-btn"
-						type="button"
-						title="Inject autoclicker"
-					>
-						AC
-					</button>
-					<button
-						id="sj-fullscreen"
-						class="toolbar-btn"
-						type="button"
-						title="Fullscreen"
-					>
-						&#9974;
-					</button>
-					<input
-						id="sj-address"
-						type="text"
-						placeholder="Search or enter a URL"
-						aria-label="Address bar"
-					/>
+					<input id="sj-search-engine" value="https://duckduckgo.com/%s" type="hidden" />
+					<button id="sj-back" class="toolbar-btn" type="button" title="Back">&#8592;</button>
+					<button id="sj-forward" class="toolbar-btn" type="button" title="Forward">&#8594;</button>
+					<button id="sj-reload" class="toolbar-btn" type="button" title="Reload">&#10227;</button>
+
+					<button id="sj-bookmarklet" class="toolbar-btn bookmarklet-btn" type="button" title="Inject autoclicker">AC</button>
+					<button id="sj-inspect" class="toolbar-btn inspect-btn" type="button" title="Inspect page">DEV</button>
+
+					<button id="sj-fullscreen" class="toolbar-btn" type="button" title="Fullscreen">&#9974;</button>
+					<input id="sj-address" type="text" placeholder="Search or enter a URL" aria-label="Address bar" />
 					<button class="go-btn" type="submit">Go</button>
 				</form>
 			</header>
@@ -94,12 +46,7 @@
 					<div title="Tempest Logo" class="logo-wrapper">
 						<h1>Tempest</h1>
 						<form id="sj-home-form" class="home-search" autocomplete="off">
-							<input
-								id="sj-home-search"
-								type="text"
-								placeholder="Search or enter a URL"
-								aria-label="Home search"
-							/>
+							<input id="sj-home-search" type="text" placeholder="Search or enter a URL" aria-label="Home search" />
 							<button type="submit">Search</button>
 						</form>
 					</div>
